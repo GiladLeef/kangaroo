@@ -1,4 +1,3 @@
-
 #ifndef CONSTANTSH
 #define CONSTANTSH
 

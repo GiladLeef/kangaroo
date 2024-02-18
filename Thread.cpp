@@ -1,5 +1,3 @@
-
-
 #include "Kangaroo.h"
 #include "Timer.h"
 #include <string.h>

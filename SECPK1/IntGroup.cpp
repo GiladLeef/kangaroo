@@ -1,5 +1,3 @@
-
-
 #include "IntGroup.h"
 
 using namespace std;

@@ -1,5 +1,3 @@
-
-
 #ifndef KANGAROOH
 #define KANGAROOH
 

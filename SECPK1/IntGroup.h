@@ -1,5 +1,3 @@
-
-
 #ifndef INTGROUPH
 #define INTGROUPH
 

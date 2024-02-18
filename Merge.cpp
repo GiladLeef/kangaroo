@@ -1,4 +1,3 @@
-
 #include "Kangaroo.h"
 #include <fstream>
 #include "SECPK1/IntGroup.h"

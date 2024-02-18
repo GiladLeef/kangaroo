@@ -1,5 +1,3 @@
-
-
 #include "HashTable.h"
 #include <stdio.h>
 #include <math.h>

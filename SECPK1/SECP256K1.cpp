@@ -1,5 +1,3 @@
-
-
 #include "SECP256k1.h"
 #include "IntGroup.h"
 #include <string.h>

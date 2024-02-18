@@ -1,5 +1,3 @@
-
-
 #ifndef POINTH
 #define POINTH
 

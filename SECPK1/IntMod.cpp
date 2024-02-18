@@ -1,5 +1,3 @@
-
-
 #include "Int.h"
 #include <emmintrin.h>
 #include <string.h>

@@ -1,5 +1,3 @@
-
-
 #ifndef SECP256K1H
 #define SECP256K1H
 

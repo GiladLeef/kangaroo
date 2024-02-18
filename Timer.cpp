@@ -1,5 +1,3 @@
-
-
 #include "Timer.h"
 
 static const char *prefix[] = { "","Kilo","Mega","Giga","Tera","Peta","Hexa" };

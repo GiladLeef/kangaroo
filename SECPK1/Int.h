@@ -1,7 +1,4 @@
-
-
 // Big integer class (Fixed size)
-
 #ifndef BIGINTH
 #define BIGINTH
 

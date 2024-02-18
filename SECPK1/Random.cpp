@@ -1,5 +1,3 @@
-
-
 #include "Random.h"
 
 #define  RK_STATE_LEN 624

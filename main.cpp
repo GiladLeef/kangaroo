@@ -1,5 +1,3 @@
-
-
 #include "Kangaroo.h"
 #include "Timer.h"
 #include "SECPK1/SECP256k1.h"

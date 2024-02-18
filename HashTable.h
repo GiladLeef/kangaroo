@@ -1,5 +1,3 @@
-
-
 #ifndef HASHTABLEH
 #define HASHTABLEH
 
