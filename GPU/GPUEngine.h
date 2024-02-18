@@ -5,11 +5,7 @@
 #include "../Constants.h"
 #include "../SECPK1/SECP256k1.h"
 
-#ifdef USE_SYMMETRY
-#define KSIZE 11
-#else
 #define KSIZE 10
-#endif
 
 #define ITEM_SIZE   56
 #define ITEM_SIZE32 (ITEM_SIZE/4)

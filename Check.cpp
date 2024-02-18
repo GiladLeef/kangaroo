@@ -495,10 +495,6 @@ void Kangaroo::Check(std::vector<int> gpuId,std::vector<int> gridSize) {
       for(int i = 0; i<nb; i++) {
         uint64_t jmp = (cpuPx[i].bits64[0] % NB_JUMP);
 
-#ifdef USE_SYMMETRY
-        // Limit cycle
-        if(jmp == lastJump[i]) jmp = (lastJump[i] + 1) % NB_JUMP;
-#endif
 
         Point J(&jumpPointx[jmp],&jumpPointy[jmp],&_1);
         Point P(&cpuPx[i],&cpuPy[i],&_1);
@@ -508,13 +504,11 @@ void Kangaroo::Check(std::vector<int> gpuId,std::vector<int> gridSize) {
 
         cpuD[i].ModAddK1order(&jumpDistance[jmp]);
 
-#ifdef USE_SYMMETRY
         // Equivalence symmetry class switch
         if(cpuPy[i].ModPositiveK1())
           cpuD[i].ModNegK1order();
         lastJump[i] = jmp;
-#endif
-
+        
         if(IsDP(cpuPx[i].bits64[3])) {
 
           // Search for DP found

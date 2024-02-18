@@ -32,10 +32,6 @@ __device__ __constant__ uint64_t jD[NB_JUMP][2];
 __device__ __constant__ uint64_t jPx[NB_JUMP][4];
 __device__ __constant__ uint64_t jPy[NB_JUMP][4];
 
-#ifdef USE_SYMMETRY
-__device__ __constant__ uint64_t _O[] = { 0xBFD25E8CD0364141ULL,0xBAAEDCE6AF48A03BULL,0xFFFFFFFFFFFFFFFEULL,0xFFFFFFFFFFFFFFFFULL };
-#endif
-
 
 #define HSIZE (GRP_SIZE / 2 - 1)
 
@@ -167,12 +163,7 @@ out[pos*ITEM_SIZE32 + 14] = ((uint32_t *)idx)[1]; \
 }
 
 // ---------------------------------------------------------------------------------------
-
-#ifdef USE_SYMMETRY
-__device__ void LoadKangaroos(uint64_t *a,uint64_t px[GPU_GRP_SIZE][4],uint64_t py[GPU_GRP_SIZE][4],uint64_t dist[GPU_GRP_SIZE][2],uint64_t *jumps) {
-#else
 __device__ void LoadKangaroos(uint64_t * a,uint64_t px[GPU_GRP_SIZE][4],uint64_t py[GPU_GRP_SIZE][4],uint64_t dist[GPU_GRP_SIZE][2]) {
-#endif
 
   __syncthreads();
 
@@ -196,9 +187,6 @@ __device__ void LoadKangaroos(uint64_t * a,uint64_t px[GPU_GRP_SIZE][4],uint64_t
     d64[0] = (a)[IDX + 8 * blockDim.x + stride];
     d64[1] = (a)[IDX + 9 * blockDim.x + stride];
 
-#ifdef USE_SYMMETRY
-    jumps[g] = (a)[IDX + 10 * blockDim.x + stride];
-#endif
   }
 
 }
@@ -249,11 +237,7 @@ __device__ void LoadKangaroo(uint64_t* a,uint32_t stride,uint64_t px[4]) {
 
 // ---------------------------------------------------------------------------------------
 
-#ifdef USE_SYMMETRY
-__device__ void StoreKangaroos(uint64_t *a,uint64_t px[GPU_GRP_SIZE][4],uint64_t py[GPU_GRP_SIZE][4],uint64_t dist[GPU_GRP_SIZE][2],uint64_t *jumps) {
-#else
 __device__ void StoreKangaroos(uint64_t * a,uint64_t px[GPU_GRP_SIZE][4],uint64_t py[GPU_GRP_SIZE][4],uint64_t dist[GPU_GRP_SIZE][2]) {
-#endif
 
   __syncthreads();
 
@@ -276,9 +260,6 @@ __device__ void StoreKangaroos(uint64_t * a,uint64_t px[GPU_GRP_SIZE][4],uint64_
     (a)[IDX + 8 * blockDim.x + stride] = d64[0];
     (a)[IDX + 9 * blockDim.x + stride] = d64[1];
 
-#ifdef USE_SYMMETRY
-    (a)[IDX + 10 * blockDim.x + stride] = jumps[g];
-#endif
   }
 
 }
@@ -494,38 +475,6 @@ __device__ void ModSub256(uint64_t* r,uint64_t* b) {
 
 }
 
-#ifdef USE_SYMMETRY
-
-// ---------------------------------------------------------------------------------------
-
-__device__ bool ModPositive256(uint64_t *r) {
-
-  // Probability of failure (1/2^192)
-  if(r[3] > 0x7FFFFFFFFFFFFFFFULL) {
-    // Negative
-    ModNeg256(r);
-    return true;
-  } else {
-    return false;
-  }
-
-}
-
-__device__ void ModNeg256Order(uint64_t* r) {
-
-  uint64_t t[4];
-  USUBO(t[0],0ULL,r[0]);
-  USUBC(t[1],0ULL,r[1]);
-  USUBC(t[2],0ULL,r[2]);
-  USUBC(t[3],0ULL,r[3]);
-  UADDO(r[0],t[0],_O[0]);
-  UADDC(r[1],t[1],_O[1]);
-  UADDC(r[2],t[2],_O[2]);
-  UADD(r[3],t[3],_O[3]);
-
-}
-
-#endif
 
 __device__ __forceinline__ uint32_t ctz(uint64_t x) {
   uint32_t n;

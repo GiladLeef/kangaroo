@@ -57,10 +57,6 @@ typedef struct {
   Int *px; // Kangaroo position
   Int *py; // Kangaroo position
   Int *distance; // Travelled distance
-
-#ifdef USE_SYMMETRY
-  uint64_t *symClass; // Last jump
-#endif
   
   SOCKET clientSock;
   char  *clientInfo;

@@ -200,20 +200,11 @@ bool  Kangaroo::CheckKey(Int d1,Int d2,uint8_t type) {
   Point P = secp->ComputePublicKey(&pk);
 
   if(P.equals(keyToSearch)) {
-    // Key solved    
-#ifdef USE_SYMMETRY
-    pk.ModAddK1order(&rangeWidthDiv2);
-#endif
     pk.ModAddK1order(&rangeStart);    
     return Output(&pk,'N',type);
   }
 
   if(P.equals(keyToSearchNeg)) {
-    // Key solved
-    pk.ModNegK1order();
-#ifdef USE_SYMMETRY
-    pk.ModAddK1order(&rangeWidthDiv2);
-#endif
     pk.ModAddK1order(&rangeStart);
     return Output(&pk,'S',type);
   }
@@ -312,11 +303,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
   // Create Kangaroos
   ph->nbKangaroo = CPU_GRP_SIZE;
 
-#ifdef USE_SYMMETRY
-  ph->symClass = new uint64_t[CPU_GRP_SIZE];
-  for(int i = 0; i<CPU_GRP_SIZE; i++) ph->symClass[i] = 0;
-#endif
-
   IntGroup *grp = new IntGroup(CPU_GRP_SIZE);
   Int *dx = new Int[CPU_GRP_SIZE];
 
@@ -348,11 +334,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
 
     for(int g = 0; g < CPU_GRP_SIZE; g++) {
 
-#ifdef USE_SYMMETRY
-      uint64_t jmp = ph->px[g].bits64[0] % (NB_JUMP/2) + (NB_JUMP / 2) * ph->symClass[g];
-#else
       uint64_t jmp = ph->px[g].bits64[0] % NB_JUMP;
-#endif
 
       Int *p1x = &jumpPointx[jmp];
       Int *p2x = &ph->px[g];
@@ -365,11 +347,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
 
     for(int g = 0; g < CPU_GRP_SIZE; g++) {
 
-#ifdef USE_SYMMETRY
-      uint64_t jmp = ph->px[g].bits64[0] % (NB_JUMP / 2) + (NB_JUMP / 2) * ph->symClass[g];
-#else
       uint64_t jmp = ph->px[g].bits64[0] % NB_JUMP;
-#endif
 
       Int *p1x = &jumpPointx[jmp];
       Int *p1y = &jumpPointy[jmp];
@@ -388,14 +366,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
       ry.ModSub(p2y);
 
       ph->distance[g].ModAddK1order(&jumpDistance[jmp]);
-
-#ifdef USE_SYMMETRY
-      // Equivalence symmetry class switch
-      if( ry.ModPositiveK1() ) {
-        ph->distance[g].ModNegK1order();
-        ph->symClass[g] = !ph->symClass[g];
-      }
-#endif
 
       ph->px[g].Set(&rx);
       ph->py[g].Set(&ry);
@@ -467,9 +437,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
   safe_delete_array(ph->px);
   safe_delete_array(ph->py);
   safe_delete_array(ph->distance);
-#ifdef USE_SYMMETRY
-  safe_delete_array(ph->symClass);
-#endif
 
   ph->isRunning = false;
 
@@ -515,11 +482,7 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
     }
   }
 
-#ifdef USE_SYMMETRY
-  gpu->SetWildOffset(&rangeWidthDiv4);
-#else
   gpu->SetWildOffset(&rangeWidthDiv2);
-#endif
   gpu->SetParams(dMask,jumpDistance,jumpPointx,jumpPointy);
   gpu->SetKangaroos(ph->px,ph->py,ph->distance);
 
@@ -645,25 +608,15 @@ void Kangaroo::CreateHerd(int nbKangaroo,Int *px,Int *py,Int *d,int firstType,bo
 
   for(uint64_t j = 0; j<nbKangaroo; j++) {
 
-#ifdef USE_SYMMETRY
 
-    // Tame in [0..N/2]
-    d[j].Rand(rangePower - 1);
-    if((j+ firstType) % 2 == WILD) {
-      // Wild in [-N/4..N/4]
-      d[j].ModSubK1order(&rangeWidthDiv4);
+ if((j + firstType) % 2 == TAME) {
+      // Tame in [0..N]
+      d[j].Rand(rangePower);
+    } else {
+      // Wild in [-N/8..N/8]
+      d[j].Rand(rangePower-2);
+      d[j].ModSubK1order(&rangeWidthDiv8);
     }
-
-#else
-
-    // Tame in [0..N]
-    d[j].Rand(rangePower);
-    if((j + firstType) % 2 == WILD) {
-      // Wild in [-N/2..N/2]
-      d[j].ModSubK1order(&rangeWidthDiv2);
-    }
-
-#endif
 
     pk.push_back(d[j]);
 
@@ -689,11 +642,6 @@ void Kangaroo::CreateHerd(int nbKangaroo,Int *px,Int *py,Int *d,int firstType,bo
     px[j].Set(&S[j].x);
     py[j].Set(&S[j].y);
 
-#ifdef USE_SYMMETRY
-    // Equivalence symmetry class switch
-    if( py[j].ModPositiveK1() )
-      d[j].ModNegK1order();
-#endif
 
   }
 
@@ -703,11 +651,8 @@ void Kangaroo::CreateHerd(int nbKangaroo,Int *px,Int *py,Int *d,int firstType,bo
 
 void Kangaroo::CreateJumpTable() {
 
-#ifdef USE_SYMMETRY
-  int jumpBit = rangePower / 2;
-#else
   int jumpBit = rangePower / 2 + 1;
-#endif
+
 
   if(jumpBit > 128) jumpBit = 128;
   int maxRetry = 100;
@@ -722,59 +667,18 @@ void Kangaroo::CreateJumpTable() {
   // Constant seed for compatibilty of workfiles
   rseed(0x600DCAFE);
 
-#ifdef USE_SYMMETRY
-  Int old;
-  old.Set(Int::GetFieldCharacteristic());
-  Int u;
-  Int v;
-  u.SetInt32(1);
-  u.ShiftL(jumpBit/2);
-  u.AddOne();
-  while(!u.IsProbablePrime()) {
-    u.AddOne();
-    u.AddOne();
-  }
-  v.Set(&u);
-  v.AddOne();
-  v.AddOne();
-  while(!v.IsProbablePrime()) {
-    v.AddOne();
-    v.AddOne();
-  }
-  Int::SetupField(&old);
-
-  ::printf("U= %s\n",u.GetBase16().c_str());
-  ::printf("V= %s\n",v.GetBase16().c_str());
-#endif
 
   // Positive only
   // When using symmetry, the sign is switched by the symmetry class switch
   while(!ok && maxRetry>0 ) {
     Int totalDist;
     totalDist.SetInt32(0);
-#ifdef USE_SYMMETRY
-    for(int i = 0; i < NB_JUMP/2; ++i) {
-      jumpDistance[i].Rand(jumpBit/2);
-      jumpDistance[i].Mult(&u);
-      if(jumpDistance[i].IsZero())
-        jumpDistance[i].SetInt32(1);
-      totalDist.Add(&jumpDistance[i]);
-    }
-    for(int i = NB_JUMP / 2; i < NB_JUMP; ++i) {
-      jumpDistance[i].Rand(jumpBit/2);
-      jumpDistance[i].Mult(&v);
-      if(jumpDistance[i].IsZero())
-        jumpDistance[i].SetInt32(1);
-      totalDist.Add(&jumpDistance[i]);
-    }
-#else
     for(int i = 0; i < NB_JUMP; ++i) {
       jumpDistance[i].Rand(jumpBit);
       if(jumpDistance[i].IsZero())
         jumpDistance[i].SetInt32(1);
       totalDist.Add(&jumpDistance[i]);
   }
-#endif
     distAvg = totalDist.ToDouble() / (double)(NB_JUMP);
     ok = distAvg>minAvg && distAvg<maxAvg;
     maxRetry--;
@@ -799,11 +703,7 @@ void Kangaroo::ComputeExpected(double dp,double *op,double *ram,double *overHead
 
   // Compute expected number of operation and memory
 
-#ifdef USE_SYMMETRY
-  double gainS = 1.0 / sqrt(2.0);
-#else
   double gainS = 1.0;
-#endif
 
   // Kangaroo number
   double k = (double)totalRW;
@@ -855,9 +755,6 @@ void Kangaroo::InitSearchKey() {
 
   Int SP;
   SP.Set(&rangeStart);
-#ifdef USE_SYMMETRY
-  SP.ModAddK1order(&rangeWidthDiv2);
-#endif
   if(!SP.IsZero()) {
     Point RS = secp->ComputePublicKey(&SP);
     RS.y.ModNeg();

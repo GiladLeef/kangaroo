@@ -7,10 +7,6 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
   uint64_t px[GPU_GRP_SIZE][4];
   uint64_t py[GPU_GRP_SIZE][4];
   uint64_t dist[GPU_GRP_SIZE][2];
-#ifdef USE_SYMMETRY
-  uint64_t lastJump[GPU_GRP_SIZE];
-#endif
-
   uint64_t dx[GPU_GRP_SIZE][4];
   uint64_t dy[4];
   uint64_t rx[4];
@@ -19,11 +15,7 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
   uint64_t _p[4];
   uint32_t jmp;
 
-#ifdef USE_SYMMETRY
-  LoadKangaroos(kangaroos,px,py,dist,lastJump);
-#else
   LoadKangaroos(kangaroos,px,py,dist);
-#endif
 
   for(int run = 0; run < NB_RUN; run++) {
 
@@ -35,10 +27,6 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
     for(int g = 0; g < GPU_GRP_SIZE; g++) {
       jmp = (uint32_t)px[g][0] & (NB_JUMP-1);
 
-#ifdef USE_SYMMETRY
-      if(jmp==lastJump[g]) jmp = (lastJump[g] + 1) % NB_JUMP;
-      lastJump[g] = jmp;
-#endif
 
       ModSub256(dx[g],px[g],jPx[jmp]);
     }
@@ -49,11 +37,7 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
 
     for(int g = 0; g < GPU_GRP_SIZE; g++) {
 
-#ifdef USE_SYMMETRY
-      jmp = lastJump[g];
-#else
       jmp = (uint32_t)px[g][0] & (NB_JUMP-1);
-#endif
 
       ModSub256(dy,py[g],jPy[jmp]);
       _ModMult(_s,dy,dx[g]);
@@ -71,10 +55,6 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
 
       Add128(dist[g],jD[jmp]);
 
-#ifdef USE_SYMMETRY
-      if(ModPositive256(py[g]))
-        ModNeg256Order(dist[g]);
-#endif
 
       if((px[g][3] & dpMask) == 0) {
 
@@ -91,10 +71,6 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
 
   }
 
-#ifdef USE_SYMMETRY
-  StoreKangaroos(kangaroos,px,py,dist,lastJump);
-#else
   StoreKangaroos(kangaroos,px,py,dist);
-#endif
 
 }

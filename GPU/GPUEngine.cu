@@ -392,11 +392,6 @@ void GPUEngine::SetKangaroos(Int *px,Int *py,Int *d) {
         inputKangarooPinned[g * strideSize + t + 8 * nbThreadPerGroup] = dOff.bits64[0];
         inputKangarooPinned[g * strideSize + t + 9 * nbThreadPerGroup] = dOff.bits64[1];
 
-#ifdef USE_SYMMETRY
-        // Last jump
-        inputKangarooPinned[t + 10 * nbThreadPerGroup] = (uint64_t)NB_JUMP;
-#endif
-
         idx++;
       }
 
@@ -510,12 +505,6 @@ void GPUEngine::SetKangaroo(uint64_t kIdx,Int *px,Int *py,Int *d) {
   cudaMemcpy(inputKangaroo + (b * blockSize + g * strideSize + t + 8 * nbThreadPerGroup),inputKangarooPinned,8,cudaMemcpyHostToDevice);
   inputKangarooPinned[0] = dOff.bits64[1];
   cudaMemcpy(inputKangaroo + (b * blockSize + g * strideSize + t + 9 * nbThreadPerGroup),inputKangarooPinned,8,cudaMemcpyHostToDevice);
-
-#ifdef USE_SYMMETRY
-  // Last jump
-  inputKangarooPinned[0] = (uint64_t)NB_JUMP;
-  cudaMemcpy(inputKangaroo + (b * blockSize + g * strideSize + t + 10 * nbThreadPerGroup),inputKangarooPinned,8,cudaMemcpyHostToDevice);
-#endif
 
 }
 
