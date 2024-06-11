@@ -1,8 +1,3 @@
-#---------------------------------------------------------------------
-# Makefile for BSGS
-#
-# Author : Jean-Luc PONS
-
 ifdef gpu
 
 SRC = SECPK1/IntGroup.cpp main.cpp SECPK1/Random.cpp \
@@ -46,18 +41,18 @@ NVCC       = $(CUDA)/bin/nvcc
 ifdef gpu
 
 ifdef debug
-CXXFLAGS   = -DWITHGPU -m64  -mssse3 -Wno-unused-result -Wno-write-strings -g -I. -I$(CUDA)/include
+CXXFLAGS   = -DWITHGPU -m64  -mssse3  -Wno-write-strings -g -I. -I$(CUDA)/include
 else
-CXXFLAGS   = -DWITHGPU -m64 -mssse3 -Wno-unused-result -Wno-write-strings -O3 -I. -I$(CUDA)/include
+CXXFLAGS   = -DWITHGPU -m64 -mssse3  -Wno-write-strings -O3 -I. -I$(CUDA)/include
 endif
 LFLAGS     = -lpthread -L$(CUDA)/lib64 -lcudart -lws2_32   # <- Added -lws2_32 here
 
 else
 
 ifdef debug
-CXXFLAGS   = -m64 -mssse3 -Wno-unused-result -Wno-write-strings -g -I. -I$(CUDA)/include
+CXXFLAGS   = -m64 -mssse3  -Wno-write-strings -g -I. -I$(CUDA)/include
 else
-CXXFLAGS   =  -m64 -mssse3 -Wno-unused-result -Wno-write-strings -O3 -I. -I$(CUDA)/include
+CXXFLAGS   =  -m64 -mssse3  -Wno-write-strings -O3 -I. -I$(CUDA)/include
 endif
 LFLAGS     = -lpthread -lws2_32   # <- Added -lws2_32 here
 
