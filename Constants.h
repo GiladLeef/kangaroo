@@ -2,7 +2,7 @@
 #define CONSTANTSH
 
 // Release number
-#define RELEASE "2.2"
+#define RELEASE "1.0"
 
 // Number of random jumps
 // Max 512 for the GPU

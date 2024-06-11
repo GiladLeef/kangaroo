@@ -3,7 +3,6 @@
 #include "SECPK1/IntGroup.h"
 #include "Timer.h"
 #include <string.h>
-#define _USE_MATH_DEFINES
 #include <math.h>
 #include <algorithm>
 #include <pthread.h>
@@ -545,7 +544,6 @@ void Kangaroo::WorkInfo(std::string &fName) {
     return;
 
   int fd = fileno(f1);
-  posix_fadvise(fd,0,0,POSIX_FADV_RANDOM|POSIX_FADV_NOREUSE);
 
   uint32_t dp1;
   Point k1;

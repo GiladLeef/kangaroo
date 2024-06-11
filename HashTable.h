@@ -4,9 +4,6 @@
 #include <string>
 #include <vector>
 #include "SECPK1/Point.h"
-#ifdef WIN64
-#include <Windows.h>
-#endif
 
 #define HASH_SIZE_BIT 18
 #define HASH_SIZE (1<<HASH_SIZE_BIT)

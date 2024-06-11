@@ -3,7 +3,6 @@
 #include "SECPK1/IntGroup.h"
 #include "Timer.h"
 #include <string.h>
-#define _USE_MATH_DEFINES
 #include <math.h>
 #include <algorithm>
 #include <pthread.h>

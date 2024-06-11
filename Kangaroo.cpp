@@ -1,13 +1,15 @@
+#include <signal.h>
+
 #include "Kangaroo.h"
 #include <fstream>
 #include "SECPK1/IntGroup.h"
 #include "Timer.h"
 #include <string.h>
-#define _USE_MATH_DEFINES
 #include <math.h>
 #include <algorithm>
 #include <pthread.h>
-
+#include <signal.h>
+#include <iostream>
 using namespace std;
 
 #define safe_delete_array(x) if(x) {delete[] x;x=NULL;}
@@ -50,7 +52,7 @@ Kangaroo::Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,string &workFi
 
   pthread_mutex_init(&ghMutex, NULL);
   pthread_mutex_init(&saveMutex, NULL);
-  signal(SIGPIPE, SIG_IGN);
+  signal(SIGFPE, SIG_IGN);
 
 }
 
@@ -142,45 +144,41 @@ void Kangaroo::SetDP(int size) {
 }
 
 // ----------------------------------------------------------------------------
+bool Kangaroo::Output(Int* pk, char sInfo, int sType) {
+    FILE* f = stdout;
+    bool needToClose = false;
 
-bool Kangaroo::Output(Int *pk,char sInfo,int sType) {
-
-
-  FILE* f = stdout;
-  bool needToClose = false;
-
-  if(outputFile.length() > 0) {
-    f = fopen(outputFile.c_str(),"a");
-    if(f == NULL) {
-      printf("Cannot open %s for writing\n",outputFile.c_str());
-      f = stdout;
+    if (!outputFile.empty()) {
+        f = fopen(outputFile.c_str(), "a");
+        if (f == nullptr) {
+            std::cerr << "Cannot open " << outputFile << " for writing\n";
+            f = stdout;
+        } else {
+            needToClose = true;
+        }
     }
-    else {
-      needToClose = true;
+
+    if (!needToClose) {
+        std::printf("\n");
     }
-  }
 
-  if(!needToClose)
-    ::printf("\n");
+    Point PR = secp->ComputePublicKey(pk);
 
-  Point PR = secp->ComputePublicKey(pk);
+    if (PR.equals(keysToSearch[keyIdx])) {
+        std::fprintf(f, "Key#%2d [%d%c]Pub:  0x%s \n", keyIdx, sType, sInfo, secp->GetPublicKeyHex(true, keysToSearch[keyIdx]).c_str());
+        std::fprintf(f, "       Priv: 0x%s \n", pk->GetBase16().c_str());
+    } else {
+        if (needToClose) {
+            fclose(f);
+        }
+        return false;
+    }
 
-  ::fprintf(f,"Key#%2d [%d%c]Pub:  0x%s \n",keyIdx,sType,sInfo,secp->GetPublicKeyHex(true,keysToSearch[keyIdx]).c_str());
-  if(PR.equals(keysToSearch[keyIdx])) {
-    ::fprintf(f,"       Priv: 0x%s \n",pk->GetBase16().c_str());
-  } else {
-    ::fprintf(f,"       Failed !\n");
-    if(needToClose)
-      fclose(f);
-    return false;
-  }
+    if (needToClose) {
+        fclose(f);
+    }
 
-
-  if(needToClose)
-    fclose(f);
-
-  return true;
-
+    return true;
 }
 
 // ----------------------------------------------------------------------------

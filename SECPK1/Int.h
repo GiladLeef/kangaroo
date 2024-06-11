@@ -192,7 +192,7 @@ private:
 };
 
 // Missing intrinsics
-static uint64_t inline _umul128(uint64_t a, uint64_t b, uint64_t *h) {
+extern uint64_t inline _umul128(uint64_t a, uint64_t b, uint64_t *h) {
   uint64_t rhi;
   uint64_t rlo;
   __asm__( "mulq  %[b];" :"=d"(rhi),"=a"(rlo) :"1"(a),[b]"rm"(b));
@@ -200,7 +200,7 @@ static uint64_t inline _umul128(uint64_t a, uint64_t b, uint64_t *h) {
   return rlo;
 }
 
-static int64_t inline _mul128(int64_t a, int64_t b, int64_t *h) {
+extern int64_t inline _mul128(int64_t a, int64_t b, int64_t *h) {
   uint64_t rhi;
   uint64_t rlo;
   __asm__( "imulq  %[b];" :"=d"(rhi),"=a"(rlo) :"1"(a),[b]"rm"(b));
@@ -216,16 +216,8 @@ static uint64_t inline _udiv128(uint64_t hi, uint64_t lo, uint64_t d,uint64_t *r
   return q;  
 }
 
-static uint64_t inline __rdtsc() {
-  uint32_t h;
-  uint32_t l;
-  __asm__( "rdtsc;" :"=d"(h),"=a"(l));
-  return (uint64_t)h << 32 | (uint64_t)l;
-}
-
 #define __shiftright128(a,b,n) ((a)>>(n))|((b)<<(64-(n)))
 #define __shiftleft128(a,b,n) ((b)<<(n))|((a)>>(64-(n)))
-
 
 #define _subborrow_u64(a,b,c,d) __builtin_ia32_sbb_u64(a,b,c,(long long unsigned int*)d);
 #define _addcarry_u64(a,b,c,d) __builtin_ia32_addcarryx_u64(a,b,c,(long long unsigned int*)d);

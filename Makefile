@@ -40,8 +40,7 @@ OBJET = $(addprefix $(OBJDIR)/, \
 endif
 
 CXX        = g++
-CUDA       = /usr/local/cuda-8.0
-CXXCUDA    = /usr/bin/g++-4.8
+CUDA       = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3"
 NVCC       = $(CUDA)/bin/nvcc
 
 ifdef gpu
@@ -51,7 +50,7 @@ CXXFLAGS   = -DWITHGPU -m64  -mssse3 -Wno-unused-result -Wno-write-strings -g -I
 else
 CXXFLAGS   = -DWITHGPU -m64 -mssse3 -Wno-unused-result -Wno-write-strings -O3 -I. -I$(CUDA)/include
 endif
-LFLAGS     = -lpthread -L$(CUDA)/lib64 -lcudart
+LFLAGS     = -lpthread -L$(CUDA)/lib64 -lcudart -lws2_32   # <- Added -lws2_32 here
 
 else
 
@@ -60,7 +59,7 @@ CXXFLAGS   = -m64 -mssse3 -Wno-unused-result -Wno-write-strings -g -I. -I$(CUDA)
 else
 CXXFLAGS   =  -m64 -mssse3 -Wno-unused-result -Wno-write-strings -O3 -I. -I$(CUDA)/include
 endif
-LFLAGS     = -lpthread
+LFLAGS     = -lpthread -lws2_32   # <- Added -lws2_32 here
 
 endif
 
@@ -69,10 +68,10 @@ endif
 ifdef gpu
 ifdef debug
 $(OBJDIR)/GPU/GPUEngine.o: GPU/GPUEngine.cu
-	$(NVCC) -G -maxrregcount=0 --ptxas-options=-v --compile --compiler-options -fPIC -ccbin $(CXXCUDA) -m64 -g -I$(CUDA)/include -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/GPU/GPUEngine.o -c GPU/GPUEngine.cu
+	$(NVCC) -G -maxrregcount=0 --ptxas-options=-v --compile --compiler-options -fPIC -ccbin cl.exe -m64 -g -I$(CUDA)/include -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/GPU/GPUEngine.o -c GPU/GPUEngine.cu
 else
 $(OBJDIR)/GPU/GPUEngine.o: GPU/GPUEngine.cu
-	$(NVCC) -maxrregcount=0 --ptxas-options=-v --compile --compiler-options -fPIC -ccbin $(CXXCUDA) -m64 -O3 -I$(CUDA)/include -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/GPU/GPUEngine.o -c GPU/GPUEngine.cu
+	$(NVCC) -maxrregcount=0 --ptxas-options=-v --compile --compiler-options -fPIC -ccbin cl.exe -m64 -O3 -I$(CUDA)/include -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/GPU/GPUEngine.o -c GPU/GPUEngine.cu
 endif
 endif
 
@@ -94,11 +93,10 @@ $(OBJDIR)/GPU: $(OBJDIR)
 	cd $(OBJDIR) && mkdir -p GPU
 
 $(OBJDIR)/SECPK1: $(OBJDIR)
-	cd $(OBJDIR) &&	mkdir -p SECPK1
+	cd $(OBJDIR) && mkdir -p SECPK1
 
 clean:
 	@echo Cleaning...
 	@rm -f obj/*.o
 	@rm -f obj/GPU/*.o
 	@rm -f obj/SECPK1/*.o
-

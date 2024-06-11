@@ -1,3 +1,5 @@
+#include <x86intrin.h>
+
 #include "Int.h"
 #include "IntGroup.h"
 #include <string.h>

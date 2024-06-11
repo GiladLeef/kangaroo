@@ -1,6 +1,12 @@
 #ifndef KANGAROOH
 #define KANGAROOH
 
+#include <pthread.h> // Include pthread.h
+#include <string>
+#include <vector>
+#include <signal.h> 
+
+
 #ifdef WIN64
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -16,25 +22,16 @@ typedef int SOCKET;
 #include <sys/time.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
-#include <signal.h>
 #endif
 
-#include <string>
-#include <vector>
 #include "SECPK1/SECP256k1.h"
 #include "HashTable.h"
 #include "SECPK1/IntGroup.h"
 #include "GPU/GPUEngine.h"
 
-#ifdef WIN64
-typedef HANDLE THREAD_HANDLE;
-#define LOCK(mutex) WaitForSingleObject(mutex,INFINITE);
-#define UNLOCK(mutex) ReleaseMutex(mutex);
-#else
 typedef pthread_t THREAD_HANDLE;
 #define LOCK(mutex)  pthread_mutex_lock(&(mutex));
 #define UNLOCK(mutex) pthread_mutex_unlock(&(mutex));
-#endif
 
 class Kangaroo;
 
@@ -186,15 +183,9 @@ private:
   bool SendKangaroosToServer(std::string& fileName,std::vector<int128_t>& kangs);
   bool GetKangaroosFromServer(std::string& fileName,std::vector<int128_t>& kangs);
 
-#ifdef WIN64
-  HANDLE ghMutex;
-  HANDLE saveMutex;
-  THREAD_HANDLE LaunchThread(LPTHREAD_START_ROUTINE func,TH_PARAM *p);
-#else
   pthread_mutex_t  ghMutex;
   pthread_mutex_t  saveMutex;
   THREAD_HANDLE LaunchThread(void *(*func) (void *), TH_PARAM *p);
-#endif
 
   void JoinThreads(THREAD_HANDLE *handles, int nbThread);
   void FreeHandles(THREAD_HANDLE *handles, int nbThread);

@@ -4,7 +4,6 @@
 #include "SECPK1/IntGroup.h"
 #include "Timer.h"
 #include <string.h>
-#define _USE_MATH_DEFINES
 #include <math.h>
 #include <algorithm>
 #include <dirent.h>
@@ -41,18 +40,17 @@ FILE * Kangaroo::OpenPart(std::string& partName,char *mode,int i,bool tmpPart) {
 }
 
 void Kangaroo::CreateEmptyPartWork(std::string& partName) {
+    struct stat st;
+    if (stat(partName.c_str(), &st) == 0) {
+        // Directory already exists
+        return;
+    }
 
-  struct stat buffer;
-  if( stat(partName.c_str(),&buffer) == 0 ) {
-    ::printf("CreateEmptyPartWork: %s exists\n",partName.c_str());
-    return;
-  }
-
-  if(mkdir(partName.c_str(),S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0) {
-    ::printf("mkdir(%s) Error:\n",partName.c_str());
-    perror("");
-    return;
-  }
+    // Create directory
+    if (mkdir(partName.c_str()) != 0) {
+        perror("mkdir");
+        return;
+    }
 
   // Header
   string hName = partName + "/header";
