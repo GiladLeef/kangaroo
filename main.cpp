@@ -12,45 +12,40 @@ using namespace std;
 
 #define CHECKARG(opt,n) if(a>=argc-1) {::printf(opt " missing argument #%d\n",n);exit(0);} else {a++;}
 
-// ------------------------------------------------------------------------------------------
-
 void printUsage() {
-
-  printf("Kangaroo [-v] [-t nbThread] [-d dpBit] [gpu] [-check]\n");
-  printf("         [-gpuId gpuId1[,gpuId2,...]] [-g g1x,g1y[,g2x,g2y,...]]\n");
-  printf("         inFile\n");
-  printf(" -v: Print version\n");
-  printf(" -gpu: Enable gpu calculation\n");
-  printf(" -gpuId gpuId1,gpuId2,...: List of GPU(s) to use, default is 0\n");
-  printf(" -g g1x,g1y,g2x,g2y,...: Specify GPU(s) kernel gridsize, default is 2*(MP),2*(Core/MP)\n");
-  printf(" -d: Specify number of leading zeros for the DP method (default is auto)\n");
-  printf(" -t nbThread: Secify number of thread\n");
-  printf(" -w workfile: Specify file to save work into (current processed key only)\n");
-  printf(" -i workfile: Specify file to load work from (current processed key only)\n");
-  printf(" -wi workInterval: Periodic interval (in seconds) for saving work\n");
-  printf(" -ws: Save kangaroos in the work file\n");
-  printf(" -wss: Save kangaroos via the server\n");
-  printf(" -wsplit: Split work file of server and reset hashtable\n");
-  printf(" -wm file1 file2 destfile: Merge work file\n");
-  printf(" -wmdir dir destfile: Merge directory of work files\n");
-  printf(" -wt timeout: Save work timeout in millisec (default is 3000ms)\n");
-  printf(" -winfo file1: Work file info file\n");
-  printf(" -wpartcreate name: Create empty partitioned work file (name is a directory)\n");
-  printf(" -wcheck worfile: Check workfile integrity\n");
-  printf(" -m maxStep: number of operations before give up the search (maxStep*expected operation)\n");
-  printf(" -s: Start in server mode\n");
-  printf(" -c server_ip: Start in client mode and connect to server server_ip\n");
-  printf(" -sp port: Server port, default is 17403\n");
-  printf(" -nt timeout: Network timeout in millisec (default is 3000ms)\n");
-  printf(" -o fileName: output result to fileName\n");
-  printf(" -l: List cuda enabled devices\n");
-  printf(" -check: Check GPU kernel vs CPU\n");
-  printf(" inFile: intput configuration file\n");
-  exit(0);
-
+    printf("Kangaroo [-v] [-t nbThread] [-d dpBit] [gpu] [-check]\n");
+    printf("         [-gpuId gpuId1[,gpuId2,...]] [-g g1x,g1y[,g2x,g2y,...]]\n");
+    printf("         inFile\n");
+    printf("Options:\n");
+    printf(" -v: Print version\n");
+    printf(" -gpu: Enable GPU calculation\n");
+    printf(" -gpuId gpuId1,gpuId2,...: List of GPU(s) to use, default is 0\n");
+    printf(" -g g1x,g1y,g2x,g2y,...: Specify GPU(s) kernel gridsize, default is 2*(MP),2*(Core/MP)\n");
+    printf(" -d: Specify number of leading zeros for the DP method (default is auto)\n");
+    printf(" -t nbThread: Specify number of threads\n");
+    printf(" -w workfile: Specify file to save work into (current processed key only)\n");
+    printf(" -i workfile: Specify file to load work from (current processed key only)\n");
+    printf(" -wi workInterval: Periodic interval (in seconds) for saving work\n");
+    printf(" -ws: Save kangaroos in the work file\n");
+    printf(" -wss: Save kangaroos via the server\n");
+    printf(" -wsplit: Split work file of server and reset hashtable\n");
+    printf(" -wm file1 file2 destfile: Merge work files\n");
+    printf(" -wmdir dir destfile: Merge directory of work files\n");
+    printf(" -wt timeout: Save work timeout in milliseconds (default is 3000ms)\n");
+    printf(" -winfo file1: Work file info file\n");
+    printf(" -wpartcreate name: Create empty partitioned work file (name is a directory)\n");
+    printf(" -wcheck workfile: Check workfile integrity\n");
+    printf(" -m maxStep: Number of operations before giving up the search (maxStep*expected operation)\n");
+    printf(" -s: Start in server mode\n");
+    printf(" -c server_ip: Start in client mode and connect to server server_ip\n");
+    printf(" -sp port: Server port, default is 17403\n");
+    printf(" -nt timeout: Network timeout in milliseconds (default is 3000ms)\n");
+    printf(" -o fileName: Output result to fileName\n");
+    printf(" -l: List CUDA enabled devices\n");
+    printf(" -check: Check GPU kernel vs CPU\n");
+    printf(" inFile: Input configuration file\n");
+    exit(0);
 }
-
-// ------------------------------------------------------------------------------------------
 
 int getInt(string name,char *v) {
 
