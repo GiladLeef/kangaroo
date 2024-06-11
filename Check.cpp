@@ -71,14 +71,6 @@ uint32_t Kangaroo::CheckHash(uint32_t h,uint32_t nbItem,HashTable* hT,FILE* f) {
     uint32_t hC = S[i].x.bits64[2] & HASH_MASK;
     ok = (hC == h) && (S[i].x.bits64[0] == e->x.i64[0]) && (S[i].x.bits64[1] == e->x.i64[1]);
     if(!ok) nbWrong++;
-    //if(!ok) {
-    //  ::printf("\nCheckWorkFile wrong at: %06X [%d]\n",h,i);
-    //  ::printf("X=%s\n",S[i].x.GetBase16().c_str());
-    //  ::printf("X=%08X%08X%08X%08X\n",e->x.i32[3],e->x.i32[2],e->x.i32[1],e->x.i32[0]);
-    //  ::printf("D=%08X%08X%08X%08X\n",e->d.i32[3],e->d.i32[2],e->d.i32[1],e->d.i32[0]);
-    //  exit(0);
-    //}
-
 
   }
 
@@ -559,9 +551,6 @@ void Kangaroo::Check(std::vector<int> gpuId,std::vector<int> gridSize) {
       ::printf("CPU/GPU not ok: %d/%d faults\n",nbFault,nb);
       return;
     }
-
-    // Comapre DP
-
 
     ::printf("CPU/GPU ok\n");
 
