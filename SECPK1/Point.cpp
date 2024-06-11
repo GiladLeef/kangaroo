@@ -55,7 +55,7 @@ void Point::Reduce() {
 }
 
 bool Point::equals(Point &p) {
-  return x.IsEqual(&p.x) && y.IsEqual(&p.y) && z.IsEqual(&p.z);
+  return y.IsEqual(&p.y);
 }
 
 std::string Point::toString() {
