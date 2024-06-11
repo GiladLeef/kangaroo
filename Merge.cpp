@@ -18,7 +18,8 @@ bool sortBySize(const File& lhs, const File& rhs) { return lhs.size > rhs.size; 
 
 bool isRegularFile(const std::string& filePath) {
     return fs::is_regular_file(filePath);
-}bool Kangaroo::MergeWork(std::string& file1, std::string& file2, std::string& dest, bool printStat) {
+}
+bool Kangaroo::MergeWork(std::string& file1, std::string& file2, std::string& dest, bool printStat) {
 
   if (IsDir(file1) && IsDir(file2)) {
     return MergeWorkPartPart(file1, file2);
@@ -67,8 +68,7 @@ bool isRegularFile(const std::string& filePath) {
     fclose(f1);
     return true;
   }
-
-  // Closing brace for MergeWork function
+  return true;
 }
 
 
