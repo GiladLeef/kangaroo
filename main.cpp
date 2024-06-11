@@ -14,7 +14,7 @@ using namespace std;
 
 void printUsage() {
     printf("Kangaroo [-v] [-t nbThread] [-d dpBit] [gpu] [-check]\n");
-    printf("         [-gpuId gpuId1[,gpuId2,...]] [-g g1x,g1y[,g2x,g2y,...]]\n");
+    printf("         [-gpuId [0, 1]] [-g [g1x, g1y]]\n");
     printf("         inFile\n");
     printf("Options:\n");
     printf(" -v: Print version\n");
