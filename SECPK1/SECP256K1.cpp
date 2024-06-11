@@ -218,32 +218,34 @@ std::string Secp256K1::GetPublicKeyHex(bool compressed, Point &pubKey) {
 }
 
 Point Secp256K1::AddDirect(Point &p1, Point &p2) {
-    Int dy;
-    Int dx;
-    Int s;
-    Int p;
+    Int dy, dx, s, p, temp;
     Point r;
     r.z.SetInt32(1);
 
-    dy.ModSub(&p2.y, &p1.y);  // dy = p2.y - p1.y
-    dx.ModSub(&p2.x, &p1.x);  // dx = p2.x - p1.x
-    dx.ModInv();              // dx = inverse(dx)
-    s.ModMulK1(&dy, &dx);     // s = dy * dx (where dx is already inverted)
+    // dy = p2.y - p1.y
+    dy.ModSub(&p2.y, &p1.y);
 
-    p.ModSquareK1(&s);        // p = s^2
+    // dx = p2.x - p1.x
+    dx.ModSub(&p2.x, &p1.x);
+    dx.ModInv();  // dx = inverse(dx)
 
-    r.x.ModSub(&p, &p1.x);    // r.x = p - p1.x
-    r.x.ModSub(&r.x, &p2.x);  // r.x = r.x - p2.x (i.e., r.x = s^2 - p1.x - p2.x)
+    // s = dy * dx (where dx is already inverted)
+    s.ModMulK1(&dy, &dx);
 
-    Int temp;
-    temp.ModSub(&p2.x, &r.x); // temp = p2.x - r.x
-    temp.ModMulK1(&s);        // temp = s * (p2.x - r.x)
-    r.y.ModSub(&temp, &p2.y); // r.y = temp - p2.y (i.e., r.y = s * (p2.x - r.x) - p2.y)
+    // p = s^2
+    p.ModSquareK1(&s);
+
+    // r.x = s^2 - p1.x - p2.x
+    r.x.ModSub(&p, &p1.x);
+    r.x.ModSub(&r.x, &p2.x);
+
+    // r.y = s * (p2.x - r.x) - p2.y
+    temp.ModSub(&p2.x, &r.x);
+    temp.ModMulK1(&s, &temp);
+    r.y.ModSub(&temp, &p2.y);
 
     return r;
 }
-
-
 std::vector<Point> Secp256K1::AddDirect(std::vector<Point> &p1,std::vector<Point> &p2) {
 
   if(p1.size()!=p2.size()) {
