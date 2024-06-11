@@ -41,26 +41,22 @@ Secp256K1::~Secp256K1() {
 Point Secp256K1::ComputePublicKey(Int *privKey,bool reduce) {
 
   int i = 0;
-  uint8_t b;
   Point Q;
   Q.Clear();
 
-  // Search first significant byte
-  for (i = 0; i < 32; i++) {
-    b = privKey->GetByte(i);
-    if(b)
-      break;
+  for (; i < 32; i++) {
+      uint8_t b = privKey->GetByte(i);
+      if (b) {
+          Q = GTable[256 * i + (b - 1)];
+          i++;
+          break;
+      }
   }
 
-  if(i<32) {
-    Q = GTable[256 * i + (b-1)];
-    i++;
-  }
-
-  for(; i < 32; i++) {
-    b = privKey->GetByte(i);
-    if(b)
-      Q = Add2(Q, GTable[256 * i + (b-1)]);
+  for (; i < 32; i++) {
+      uint8_t b = privKey->GetByte(i);
+      if (b)
+          Q = Add2(Q, GTable[256 * i + (b - 1)]);
   }
 
   if(reduce) Q.Reduce();
