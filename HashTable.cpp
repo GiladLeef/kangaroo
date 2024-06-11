@@ -181,38 +181,34 @@ void HashTable::CalcDistAndType(int128_t d, Int* kDist, uint32_t* kType) {
     kDist->bits64[1] = d.i64[1];
     if(sign) kDist->ModNegK1order();
 }
-
 int HashTable::Add(uint64_t h, ENTRY* e) {
-    if(E[h].maxItem == 0) {
-        E[h].maxItem = 16;
-        E[h].items = (ENTRY **)malloc(sizeof(ENTRY *) * E[h].maxItem);
+    if (E[h].items == NULL) {
+        // Initialize a linked list for chaining
+        E[h].items = (ENTRY **)malloc(sizeof(ENTRY *));
+        E[h].maxItem = 1;
     }
-    if(E[h].nbItem == 0) {
-        E[h].items[0] = e;
-        E[h].nbItem = 1;
-        return ADD_OK;
-    }
-    if(E[h].nbItem >= E[h].maxItem - 1) {
-        ReAllocate(h,4);
-    }
-    int st,ed,mi;
-    st = 0; ed = E[h].nbItem - 1;
-    while(st <= ed) {
-        mi = (st + ed) / 2;
-        int comp = compare(&e->x,&GET(h,mi)->x);
-        if(comp<0) {
-            ed = mi - 1;
-        } else if (comp==0) {
-            if((e->d.i64[0] == GET(h,mi)->d.i64[0]) && (e->d.i64[1] == GET(h,mi)->d.i64[1])) {
+
+    // Traverse the linked list to check for duplicates
+    for (int i = 0; i < E[h].nbItem; i++) {
+        if (compare(&e->x, &GET(h, i)->x) == 0) {
+            if ((e->d.i64[0] == GET(h, i)->d.i64[0]) && (e->d.i64[1] == GET(h, i)->d.i64[1])) {
                 return ADD_DUPLICATE;
+            } else {
+                CalcDistAndType(GET(h, i)->d, &kDist, &kType);
+                return ADD_COLLISION;
             }
-            CalcDistAndType(GET(h,mi)->d , &kDist, &kType);
-            return ADD_COLLISION;
-        } else {
-            st = mi + 1;
         }
     }
-    ADD_ENTRY(e);
+
+    // If no duplicate is found, add the new entry to the end of the linked list
+    if (E[h].nbItem >= E[h].maxItem) {
+        // Resize the linked list if necessary
+        E[h].maxItem *= 2;
+        E[h].items = (ENTRY **)realloc(E[h].items, sizeof(ENTRY *) * E[h].maxItem);
+    }
+
+    // Add the new entry to the end of the linked list
+    E[h].items[E[h].nbItem++] = e;
     return ADD_OK;
 }
 
