@@ -2,8 +2,7 @@
 #include "IntGroup.h"
 #include <string.h>
 
-Secp256K1::Secp256K1() {
-}
+Secp256K1::Secp256K1() {}
 
 void Secp256K1::Init() {
 
@@ -218,32 +217,32 @@ std::string Secp256K1::GetPublicKeyHex(bool compressed, Point &pubKey) {
 
 }
 
-Point Secp256K1::AddDirect(Point &p1,Point &p2) {
+Point Secp256K1::AddDirect(Point &p1, Point &p2) {
+    Int dy;
+    Int dx;
+    Int s;
+    Int p;
+    Point r;
+    r.z.SetInt32(1);
 
-  Int _s;
-  Int _p;
-  Int dy;
-  Int dx;
-  Point r;
-  r.z.SetInt32(1);
+    dy.ModSub(&p2.y, &p1.y);  // dy = p2.y - p1.y
+    dx.ModSub(&p2.x, &p1.x);  // dx = p2.x - p1.x
+    dx.ModInv();              // dx = inverse(dx)
+    s.ModMulK1(&dy, &dx);     // s = dy * dx (where dx is already inverted)
 
-  dy.ModSub(&p2.y,&p1.y);
-  dx.ModSub(&p2.x,&p1.x);
-  dx.ModInv();
-  _s.ModMulK1(&dy,&dx);     // s = (p2.y-p1.y)*inverse(p2.x-p1.x);
+    p.ModSquareK1(&s);        // p = s^2
 
-  _p.ModSquareK1(&_s);       // _p = pow2(s)
+    r.x.ModSub(&p, &p1.x);    // r.x = p - p1.x
+    r.x.ModSub(&r.x, &p2.x);  // r.x = r.x - p2.x (i.e., r.x = s^2 - p1.x - p2.x)
 
-  r.x.ModSub(&_p,&p1.x);
-  r.x.ModSub(&p2.x);       // rx = pow2(s) - p1.x - p2.x;
+    Int temp;
+    temp.ModSub(&p2.x, &r.x); // temp = p2.x - r.x
+    temp.ModMulK1(&s);        // temp = s * (p2.x - r.x)
+    r.y.ModSub(&temp, &p2.y); // r.y = temp - p2.y (i.e., r.y = s * (p2.x - r.x) - p2.y)
 
-  r.y.ModSub(&p2.x,&r.x);
-  r.y.ModMulK1(&_s);
-  r.y.ModSub(&p2.y);       // ry = - p2.y - s*(ret.x-p2.x);  
-
-  return r;
-
+    return r;
 }
+
 
 std::vector<Point> Secp256K1::AddDirect(std::vector<Point> &p1,std::vector<Point> &p2) {
 
