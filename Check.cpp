@@ -2,145 +2,104 @@
 #include <fstream>
 #include "SECPK1/IntGroup.h"
 #include "Timer.h"
-#include <string.h>
-#include <math.h>
-#include <algorithm>
-#include <pthread.h>
-#define _strdup strdup
+#include <string>
+#include <vector>
+#include <iostream>
+#include <memory>
+#include <thread>
+#include <atomic>
+#include <cmath>
 
 using namespace std;
 
-uint32_t Kangaroo::CheckHash(uint32_t h,uint32_t nbItem,HashTable* hT,FILE* f) {
+uint32_t Kangaroo::CheckHash(uint32_t h, uint32_t nbItem, HashTable* hT, FILE* f) {
+    bool ok = true;
+    vector<Int> dists;
+    vector<uint32_t> types;
+    Point Z;
+    Z.Clear();
+    uint32_t nbWrong = 0;
 
-  bool ok=true;
-  vector<Int> dists;
-  vector<uint32_t> types;
-  Point Z;
-  Z.Clear();
-  uint32_t nbWrong = 0;
-  ENTRY *items = NULL;
-  ENTRY* e;
-
-  if( hT ) {
-
-    for(uint32_t i = 0; i < nbItem; i++) {
-      e = hT->E[h].items[i];
-      Int dist;
-      uint32_t kType;
-      HashTable::CalcDistAndType(e->d,&dist,&kType);
-      dists.push_back(dist);
-      types.push_back(kType);
+    unique_ptr<ENTRY[]> items;
+    if (!hT) {
+        items = make_unique<ENTRY[]>(nbItem);
+        fread(items.get(), sizeof(ENTRY), nbItem, f);
     }
 
-  } else {
-
-    items = (ENTRY*)malloc(nbItem * sizeof(ENTRY));
-
-    for(uint32_t i = 0; i < nbItem; i++) {
-      ::fread(items+i,32,1,f);
-      e = items + i;
-      Int dist;
-      uint32_t kType;
-      HashTable::CalcDistAndType(e->d,&dist,&kType);
-      dists.push_back(dist);
-      types.push_back(kType);
+    for (uint32_t i = 0; i < nbItem; i++) {
+        const ENTRY* e = hT ? hT->E[h].items[i] : &items[i];
+        Int dist;
+        uint32_t kType;
+        HashTable::CalcDistAndType(e->d, &dist, &kType);
+        dists.push_back(dist);
+        types.push_back(kType);
     }
 
-  }
-
-  vector<Point> P = secp->ComputePublicKeys(dists);
-  vector<Point> Sp;
-
-  for(uint32_t i = 0; i < nbItem; i++) {
-
-    if(types[i] == TAME) {
-      Sp.push_back(Z);
-    } else {
-      Sp.push_back(keyToSearch);
+    vector<Point> P = secp->ComputePublicKeys(dists);
+    vector<Point> Sp;
+    for (uint32_t i = 0; i < nbItem; i++) {
+        if (types[i] == TAME) {
+            Sp.push_back(Z);
+        } else {
+            Sp.push_back(keyToSearch);
+        }
     }
 
-  }
+    vector<Point> S = secp->AddDirect(Sp, P);
+    for (uint32_t i = 0; i < nbItem; i++) {
+        const ENTRY* e = hT ? hT->E[h].items[i] : &items[i];
+        uint32_t hC = S[i].x.bits64[2] & HASH_MASK;
+        ok = (hC == h) && (S[i].x.bits64[0] == e->x.i64[0]) && (S[i].x.bits64[1] == e->x.i64[1]);
+        if (!ok) nbWrong++;
+    }
 
-  vector<Point> S = secp->AddDirect(Sp,P);
-
-  for(uint32_t i = 0; i < nbItem; i++) {
-
-    if(hT)    e = hT->E[h].items[i];
-    else      e = items + i;
-
-    uint32_t hC = S[i].x.bits64[2] & HASH_MASK;
-    ok = (hC == h) && (S[i].x.bits64[0] == e->x.i64[0]) && (S[i].x.bits64[1] == e->x.i64[1]);
-    if(!ok) nbWrong++;
-
-  }
-
-  if(items) free(items);
-  return nbWrong;
-
+    return nbWrong;
 }
 
 bool Kangaroo::CheckPartition(TH_PARAM* p) {
+    uint32_t part = p->hStart;
+    string pName = string(p->part1Name);
+    ifstream f1(pName + "/header", ios::binary);
+    if (!f1.is_open()) return false;
 
-  uint32_t part = p->hStart;
-  string pName = string(p->part1Name);
+    uint32_t hStart = part * (HASH_SIZE / MERGE_PART);
+    uint32_t hStop = (part + 1) * (HASH_SIZE / MERGE_PART);
+    p->hStart = 0;
 
-  FILE* f1 = OpenPart(pName,"rb",part,false);
-  if(f1 == NULL) return false;
+    for (uint32_t h = hStart; h < hStop; h++) {
+        uint32_t nbItem, maxItem;
+        f1.read(reinterpret_cast<char*>(&nbItem), sizeof(uint32_t));
+        f1.read(reinterpret_cast<char*>(&maxItem), sizeof(uint32_t));
+        if (nbItem == 0) continue;
+        p->hStop += CheckHash(h, nbItem, nullptr, nullptr);
+        p->hStart += nbItem;
+    }
 
-  uint32_t hStart = part * (HASH_SIZE / MERGE_PART);
-  uint32_t hStop = (part + 1) * (HASH_SIZE / MERGE_PART);
-  p->hStart = 0;
-
-  for(uint32_t h = hStart; h < hStop; h++) {
-
-    uint32_t nbItem;
-    uint32_t maxItem;
-    ::fread(&nbItem,sizeof(uint32_t),1,f1);
-    ::fread(&maxItem,sizeof(uint32_t),1,f1);
-
-    if(nbItem == 0)
-      continue;
-    p->hStop += CheckHash(h,nbItem,NULL,f1);
-    p->hStart += nbItem;
-
-  }
-
-  ::fclose(f1);
-  return true;
-
+    return true;
 }
 
 bool Kangaroo::CheckWorkFile(TH_PARAM* p) {
-
-  uint32_t nWrong = 0;
-
-  for(uint32_t h = p->hStart; h < p->hStop; h++) {
-
-    if(hashTable.E[h].nbItem == 0)
-      continue;
-    nWrong += CheckHash(h,hashTable.E[h].nbItem,&hashTable,NULL);
-
-  }
-
-  p->hStop = nWrong;
-
-  return true;
-
+    uint32_t nWrong = 0;
+    for (uint32_t h = p->hStart; h < p->hStop; h++) {
+        if (hashTable.E[h].nbItem == 0) continue;
+        nWrong += CheckHash(h, hashTable.E[h].nbItem, &hashTable, nullptr);
+    }
+    p->hStop = nWrong;
+    return true;
 }
 
 void* _checkPartThread(void* lpParam) {
-  TH_PARAM* p = (TH_PARAM*)lpParam;
-  p->obj->CheckPartition(p);
-  p->isRunning = false;
-  return 0;
+    auto p = reinterpret_cast<TH_PARAM*>(lpParam);
+    p->obj->CheckPartition(p);
+    p->isRunning = false;
+    return nullptr;
 }
 
-
 void* _checkWorkThread(void* lpParam) {
-  TH_PARAM* p = (TH_PARAM*)lpParam;
-  p->obj->CheckWorkFile(p);
-  p->isRunning = false;
-  return 0;
+    auto p = reinterpret_cast<TH_PARAM*>(lpParam);
+    p->obj->CheckWorkFile(p);
+    p->isRunning = false;
+    return nullptr;
 }
 
 void Kangaroo::CheckPartition(int nbCore,std::string& partName) {
