@@ -9,6 +9,10 @@ Pollard's Kangaroo algorithm offers a powerful solution for tackling the Ellipti
 - **Fast modular multiplication:** Utilizes 2 steps folding 512 bits to 256 bits reduction using 64-bit digits.
 - **Multi-GPU support:** Supports multi-GPU usage for parallel processing.
 - **CUDA optimization:** CUDA optimization through inline PTX assembly for enhanced performance.
+- 
+### How It Works
+
+The algorithm employs two herds of kangaroos, a tame herd, and a wild herd. When a kangaroo from each herd collides, the key can be solved. The distinguished points method with a hashtable is used to detect collisions efficiently. The algorithm iteratively updates the positions of the kangaroos until a collision is detected, leading to the solution of the ECDLP.
 
 ### Input File Structure
 
@@ -42,7 +46,3 @@ Work files can be saved periodically using various options (-w, -wi, -ws). When 
 
 The probability of success after a certain number of group operations is illustrated, considering the range size (N). The plot provides insights into the likelihood of solving the ECDLP within a given range.
 ![successprob](https://github.com/GiladLeef/kangaroo/assets/96906027/bd7865f5-1eef-4207-b6a6-eac80a5064bb)
-
-### How It Works
-
-The algorithm employs two herds of kangaroos, a tame herd, and a wild herd. When a kangaroo from each herd collides, the key can be solved. The distinguished points method with a hashtable is used to detect collisions efficiently. The algorithm iteratively updates the positions of the kangaroos until a collision is detected, leading to the solution of the ECDLP.
