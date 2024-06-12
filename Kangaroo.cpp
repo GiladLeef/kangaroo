@@ -610,9 +610,6 @@ void Kangaroo::CreateJumpTable() {
   double distAvg;
   double maxAvg = pow(2.0,(double)jumpBit - 0.95);
   double minAvg = pow(2.0,(double)jumpBit - 1.05);
-  //::printf("Jump Avg distance min: 2^%.2f\n",log2(minAvg));
-  //::printf("Jump Avg distance max: 2^%.2f\n",log2(maxAvg));
-  
   // Kangaroo jumps
   // Constant seed for compatibilty of workfiles
   rseed(0x600DCAFE);
