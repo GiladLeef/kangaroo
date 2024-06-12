@@ -480,47 +480,6 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
 
         } else {
 
-//#define VALIDITY_POINT_CHECK
-#ifdef VALIDITY_POINT_CHECK
-          // Check validity
-          for(uint32_t i=0;i< head.nbDP;i++) {
-            
-            uint64_t h = (uint64_t)dp[i].h;
-            if(h >= HASH_SIZE) {
-              ::printf("\nInvalid data from: %s [dp=%d PID=%u thId=%u gpuId=%u]\n",p->clientInfo,i,
-                                                            head.processId,head.threadId,head.gpuId);
-              free(dp);
-              CLIENT_ABORT();
-            }
-
-            Int dist;
-            uint32_t kType;
-            HashTable::CalcDistAndType(dp[i].d,&dist,&kType);
-            Point P = secp->ComputePublicKey(&dist);
-
-            if(kType == WILD)
-              P = secp->AddDirect(keyToSearch,P);
-
-            uint32_t hC = P.x.bits64[2] & HASH_MASK;
-            bool ok = (hC == h) && (P.x.bits64[0] == dp[i].x.i64[0]) && (P.x.bits64[1] == dp[i].x.i64[1]);
-            if(!ok) {
-              if(kType==TAME) {
-                ::printf("\nWrong TAME point from: %s [dp=%d PID=%u thId=%u gpuId=%u]\n",p->clientInfo,i,
-                  head.processId,head.threadId,head.gpuId);
-              } else {
-                ::printf("\nWrong WILD point from: %s [dp=%d PID=%u thId=%u gpuId=%u]\n",p->clientInfo,i,
-                  head.processId,head.threadId,head.gpuId);
-              }
-              //::printf("X=%s\n",P.x.GetBase16().c_str());
-              //::printf("X=%08X%08X%08X%08X\n",dp[i].x.i32[3],dp[i].x.i32[2],dp[i].x.i32[1],dp[i].x.i32[0]);
-              //::printf("D=%08X%08X%08X%08X\n",dp[i].d.i32[3],dp[i].d.i32[2],dp[i].d.i32[1],dp[i].d.i32[0]);
-              free(dp);
-              CLIENT_ABORT();
-            }
-
-          }
-#endif
-
           LOCK(ghMutex);
           DP_CACHE dc;
           dc.nbDP = head.nbDP;
@@ -1157,4 +1116,3 @@ bool Kangaroo::GetConfigFromServer() {
   return true;
 
 }
-
