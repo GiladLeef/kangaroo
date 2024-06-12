@@ -589,61 +589,48 @@ void *_SolveKeyGPU(void *lpParam) {
 }
 
 // ----------------------------------------------------------------------------
+void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstType, bool lock) {
+    vector<Int> pk(nbKangaroo);
+    vector<Point> S(nbKangaroo);
+    vector<Point> Sp(nbKangaroo);
 
-void Kangaroo::CreateHerd(int nbKangaroo,Int *px,Int *py,Int *d,int firstType,bool lock) {
+    Point Z;
+    Z.Clear();
 
-  vector<Int> pk;
-  vector<Point> S;
-  vector<Point> Sp;
-  pk.reserve(nbKangaroo);
-  S.reserve(nbKangaroo);
-  Sp.reserve(nbKangaroo);
-  Point Z;
-  Z.Clear();
+    int offset = firstType % 2; // Calculate this once
 
-  // Choose random starting distance
-  if(lock) LOCK(ghMutex);
+    if (lock) LOCK(ghMutex);
 
-  for(uint64_t j = 0; j<nbKangaroo; j++) {
+    for (int j = 0; j < nbKangaroo; j++) {
+        if ((j + offset) % 2 == TAME) {
+            // Tame in [0..N]
+            d[j].Rand(rangePower);
+        } else {
+            // Wild in [-N/8..N/8]
+            d[j].Rand(rangePower - 2);
+            d[j].ModSubK1order(&rangeWidthDiv8);
+        }
 
-
- if((j + firstType) % 2 == TAME) {
-      // Tame in [0..N]
-      d[j].Rand(rangePower);
-    } else {
-      // Wild in [-N/8..N/8]
-      d[j].Rand(rangePower-2);
-      d[j].ModSubK1order(&rangeWidthDiv8);
+        pk[j] = d[j];
     }
 
-    pk.push_back(d[j]);
+    if (lock) UNLOCK(ghMutex);
 
-  }
+    // Compute starting pos
+    S = secp->ComputePublicKeys(pk);
 
-  if(lock) UNLOCK(ghMutex);
-
-  // Compute starting pos
-  S = secp->ComputePublicKeys(pk);
-
-  for(uint64_t j = 0; j<nbKangaroo; j++) {
-    if((j + firstType) % 2 == TAME) {
-      Sp.push_back(Z);
-    } else {
-      Sp.push_back(keyToSearch);
+    for (int j = 0; j < nbKangaroo; j++) {
+        Sp[j] = ((j + offset) % 2 == TAME) ? Z : keyToSearch;
     }
-  }
 
-  S = secp->AddDirect(Sp,S);
+    S = secp->AddDirect(Sp, S);
 
-  for(uint64_t j = 0; j<nbKangaroo; j++) {
-
-    px[j].Set(&S[j].x);
-    py[j].Set(&S[j].y);
-
-
-  }
-
+    for (int j = 0; j < nbKangaroo; j++) {
+        px[j].Set(&S[j].x);
+        py[j].Set(&S[j].y);
+    }
 }
+
 
 // ----------------------------------------------------------------------------
 
