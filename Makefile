@@ -73,9 +73,9 @@ endif
 $(OBJDIR)/%.o : %.cpp
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
-all: bsgs
+all: Kangaroo
 
-bsgs: $(OBJET)
+Kangaroo: $(OBJET)
 	@echo Making Kangaroo...
 	$(CXX) $(OBJET) $(LFLAGS) -o kangaroo
 
