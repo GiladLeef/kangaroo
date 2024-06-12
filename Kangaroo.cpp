@@ -288,6 +288,7 @@ bool Kangaroo::AddToTable(uint64_t h,int128_t *x,int128_t *d) {
 
 }
 
+
 void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     // Global init
     int thId = ph->threadId;
@@ -315,6 +316,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     Int **p2xs = new Int*[CPU_GRP_SIZE];
     Int **p2ys = new Int*[CPU_GRP_SIZE];
     Int **distances = new Int*[CPU_GRP_SIZE];
+    bool *isDPs = new bool[CPU_GRP_SIZE];
 
     while (!endOfSearch) {
         // Calculate jumps and initialize pointers
@@ -329,6 +331,11 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
         }
         grp->Set(dx);
         grp->ModInv();
+
+        // Calculate isDPs outside the loop
+        for (int g = 0; g < CPU_GRP_SIZE; g++) {
+            isDPs[g] = IsDP(ph->px[g].bits64[3]);
+        }
 
         for (int g = 0; g < CPU_GRP_SIZE; g++) {
             dy.ModSub(p2ys[g], p1ys[g]);
@@ -346,19 +353,17 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
 
             // Update distance
             ph->distance[g].ModAddK1order(distances[g]);
+
+            if (clientMode && isDPs[g]) {
+                ITEM it;
+                it.x.Set(&ph->px[g]);
+                it.d.Set(&ph->distance[g]);
+                it.kIdx = g;
+                // Push to server request
+            }
         }
 
         if (clientMode) {
-            // Send DP to server
-            for (int g = 0; g < CPU_GRP_SIZE; g++) {
-                if (IsDP(ph->px[g].bits64[3])) {
-                    ITEM it;
-                    it.x.Set(&ph->px[g]);
-                    it.d.Set(&ph->distance[g]);
-                    it.kIdx = g;
-                    // Push to server request
-                }
-            }
             double now = Timer::get_tick();
             if (now - lastSent > SEND_PERIOD) {
                 LOCK(ghMutex);
@@ -370,7 +375,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
         } else {
             // Add to table and collision check
             for (int g = 0; g < CPU_GRP_SIZE && !endOfSearch; g++) {
-                if (IsDP(ph->px[g].bits64[3])) {
+                if (isDPs[g]) {
                     LOCK(ghMutex);
                     if (!endOfSearch) {
                         if (!AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
@@ -404,6 +409,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     delete[] p2xs;
     delete[] p2ys;
     delete[] distances;
+    delete[] isDPs;
 
     // No need to delete individual arrays, just delete the outer struct
     safe_delete_array(ph->px);
