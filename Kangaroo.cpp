@@ -287,6 +287,7 @@ bool Kangaroo::AddToTable(uint64_t h,int128_t *x,int128_t *d) {
   return addStatus == ADD_OK;
 
 }
+
 void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     // Global init
     int thId = ph->threadId;
@@ -315,9 +316,9 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     Int **p2ys = new Int*[CPU_GRP_SIZE];
     Int **distances = new Int*[CPU_GRP_SIZE];
 
-    while(!endOfSearch) {
+    while (!endOfSearch) {
         // Calculate jumps and initialize pointers
-        for(int g = 0; g < CPU_GRP_SIZE; g++) {
+        for (int g = 0; g < CPU_GRP_SIZE; g++) {
             jmps[g] = ph->px[g].bits64[0] % NB_JUMP;
             p1xs[g] = &jumpPointx[jmps[g]];
             p1ys[g] = &jumpPointy[jmps[g]];
@@ -329,7 +330,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
         grp->Set(dx);
         grp->ModInv();
 
-        for(int g = 0; g < CPU_GRP_SIZE; g++) {
+        for (int g = 0; g < CPU_GRP_SIZE; g++) {
             dy.ModSub(p2ys[g], p1ys[g]);
             _s.ModMulK1(&dy, &dx[g]);
             _p.ModSquareK1(&_s);
@@ -347,10 +348,10 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             ph->distance[g].ModAddK1order(distances[g]);
         }
 
-        if(clientMode) {
+        if (clientMode) {
             // Send DP to server
-            for(int g = 0; g < CPU_GRP_SIZE; g++) {
-                if(IsDP(ph->px[g].bits64[3])) {
+            for (int g = 0; g < CPU_GRP_SIZE; g++) {
+                if (IsDP(ph->px[g].bits64[3])) {
                     ITEM it;
                     it.x.Set(&ph->px[g]);
                     it.d.Set(&ph->distance[g]);
@@ -359,20 +360,20 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
                 }
             }
             double now = Timer::get_tick();
-            if(now - lastSent > SEND_PERIOD) {
+            if (now - lastSent > SEND_PERIOD) {
                 LOCK(ghMutex);
                 // Send to server
                 UNLOCK(ghMutex);
                 lastSent = now;
             }
-            if(!endOfSearch) counters[thId] += CPU_GRP_SIZE;
+            if (!endOfSearch) counters[thId] += CPU_GRP_SIZE;
         } else {
             // Add to table and collision check
-            for(int g = 0; g < CPU_GRP_SIZE && !endOfSearch; g++) {
-                if(IsDP(ph->px[g].bits64[3])) {
+            for (int g = 0; g < CPU_GRP_SIZE && !endOfSearch; g++) {
+                if (IsDP(ph->px[g].bits64[3])) {
                     LOCK(ghMutex);
-                    if(!endOfSearch) {
-                        if(!AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
+                    if (!endOfSearch) {
+                        if (!AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
                             // Collision inside the same herd
                             // Reset the kangaroo
                             CreateHerd(1, &ph->px[g], &ph->py[g], &ph->distance[g], g % 2, false);
@@ -381,12 +382,12 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
                     }
                     UNLOCK(ghMutex);
                 }
-                if(!endOfSearch) counters[thId]++;
+                if (!endOfSearch) counters[thId]++;
             }
         }
 
         // Save request
-        if(saveRequest && !endOfSearch) {
+        if (saveRequest && !endOfSearch) {
             ph->isWaiting = true;
             LOCK(saveMutex);
             ph->isWaiting = false;
@@ -411,7 +412,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
 
     ph->isRunning = false;
 }
-
 
 void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
 
