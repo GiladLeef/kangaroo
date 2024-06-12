@@ -46,9 +46,3 @@ The probability of success after a certain number of group operations is illustr
 ### How It Works
 
 The algorithm employs two herds of kangaroos, a tame herd, and a wild herd. When a kangaroo from each herd collides, the key can be solved. The distinguished points method with a hashtable is used to detect collisions efficiently. The algorithm iteratively updates the positions of the kangaroos until a collision is detected, leading to the solution of the ECDLP.
-
-### Articles
-
-Several articles provide in-depth discussions and analyses of the Kangaroo algorithm and its applications in solving the discrete logarithm problem within a short interval. These articles offer valuable insights into the theoretical foundations and practical implementations of the algorithm.
-
-By leveraging Pollard's Kangaroo algorithm for SECPK1, users can efficiently tackle challenging ECDLP instances, making it a valuable tool for cryptographic research and real-world applications.
