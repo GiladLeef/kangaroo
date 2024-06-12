@@ -299,16 +299,16 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     double lastSent = 0;
 
     // Preallocate memory for arrays
-    IntGroup *grp = new IntGroup(CPU_GRP_SIZE);
-    Int *dx = new Int[CPU_GRP_SIZE];
+    IntGroup grp(CPU_GRP_SIZE);
+    Int dx[CPU_GRP_SIZE];
     Int dy, rx, ry, _s, _p;
-    uint64_t *jmps = new uint64_t[CPU_GRP_SIZE];
-    Int **p1xs = new Int*[CPU_GRP_SIZE];
-    Int **p1ys = new Int*[CPU_GRP_SIZE];
-    Int **p2xs = new Int*[CPU_GRP_SIZE];
-    Int **p2ys = new Int*[CPU_GRP_SIZE];
-    Int **distances = new Int*[CPU_GRP_SIZE];
-    bool *isDPs = new bool[CPU_GRP_SIZE];
+    uint64_t jmps[CPU_GRP_SIZE];
+    Int *p1xs[CPU_GRP_SIZE];
+    Int *p1ys[CPU_GRP_SIZE];
+    Int *p2xs[CPU_GRP_SIZE];
+    Int *p2ys[CPU_GRP_SIZE];
+    Int *distances[CPU_GRP_SIZE];
+    bool isDPs[CPU_GRP_SIZE];
 
     // Create Kangaroos if not already loaded
     if (ph->px == nullptr) {
@@ -335,8 +335,8 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             dx[g].ModSub(p2xs[g], p1xs[g]);
             isDPs[g] = IsDP(ph->px[g].bits64[3]);
         }
-        grp->Set(dx);
-        grp->ModInv();
+        grp.Set(dx);
+        grp.ModInv();
 
         for (int g = 0; g < CPU_GRP_SIZE; g++) {
             dy.ModSub(p2ys[g], p1ys[g]);
@@ -372,23 +372,21 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
                 UNLOCK(ghMutex);
                 lastSent = now;
             }
-            if (!endOfSearch) counters[thId] += CPU_GRP_SIZE;
+            counters[thId] += CPU_GRP_SIZE;
         } else {
             // Add to table and collision check
-            for (int g = 0; g < CPU_GRP_SIZE && !endOfSearch; g++) {
+            for (int g = 0; g < CPU_GRP_SIZE; g++) {
                 if (isDPs[g]) {
                     LOCK(ghMutex);
-                    if (!endOfSearch) {
-                        if (!AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
-                            // Collision inside the same herd
-                            // Reset the kangaroo
-                            CreateHerd(1, &ph->px[g], &ph->py[g], &ph->distance[g], g % 2, false);
-                            collisionInSameHerd++;
-                        }
+                    if (!endOfSearch && !AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
+                        // Collision inside the same herd
+                        // Reset the kangaroo
+                        CreateHerd(1, &ph->px[g], &ph->py[g], &ph->distance[g], g % 2, false);
+                        collisionInSameHerd++;
                     }
                     UNLOCK(ghMutex);
                 }
-                if (!endOfSearch) counters[thId]++;
+                counters[thId]++;
             }
         }
 
@@ -400,17 +398,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             UNLOCK(saveMutex);
         }
     }
-
-    // Free allocated memory
-    delete grp;
-    delete[] dx;
-    delete[] jmps;
-    delete[] p1xs;
-    delete[] p1ys;
-    delete[] p2xs;
-    delete[] p2ys;
-    delete[] distances;
-    delete[] isDPs;
 
     // No need to delete individual arrays, just delete the outer struct
     safe_delete_array(ph->px);
