@@ -9,7 +9,7 @@ SRC = SECPK1/IntGroup.cpp Main.cpp SECPK1/Random.cpp \
 OBJDIR = obj
 
 OBJET = $(addprefix $(OBJDIR)/, \
-      SECPK1/IntGroup.o main.o SECPK1/Random.o \
+      SECPK1/IntGroup.o Main.o SECPK1/Random.o \
       Timer.o SECPK1/Int.o SECPK1/IntMod.o \
       SECPK1/Point.o SECPK1/SECP256K1.o \
       GPU/GPUEngine.o Kangaroo.o HashTable.o Thread.o \
@@ -26,7 +26,7 @@ SRC = SECPK1/IntGroup.cpp Main.cpp SECPK1/Random.cpp \
 OBJDIR = obj
 
 OBJET = $(addprefix $(OBJDIR)/, \
-      SECPK1/IntGroup.o main.o SECPK1/Random.o \
+      SECPK1/IntGroup.o Main.o SECPK1/Random.o \
       Timer.o SECPK1/Int.o SECPK1/IntMod.o \
       SECPK1/Point.o SECPK1/SECP256K1.o \
       Kangaroo.o HashTable.o Thread.o Check.o Backup.o \
