@@ -288,25 +288,17 @@ bool Kangaroo::AddToTable(uint64_t h,int128_t *x,int128_t *d) {
 
 }
 
+// Inline function for checking if a value is a DP
+inline bool IsDP(const uint64_t value) {
+    return (value & 0x01) == 0;
+}
 
 void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     // Global init
     int thId = ph->threadId;
     double lastSent = 0;
 
-    // Create Kangaroos if not already loaded
-    if(ph->px == nullptr) {
-        ph->px = new Int[CPU_GRP_SIZE];
-        ph->py = new Int[CPU_GRP_SIZE];
-        ph->distance = new Int[CPU_GRP_SIZE];
-        CreateHerd(CPU_GRP_SIZE, ph->px, ph->py, ph->distance, TAME);
-    }
-
-    if(keyIdx == 0)
-        ::printf("SolveKeyCPU Thread %d: %d kangaroos\n", ph->threadId, CPU_GRP_SIZE);
-
-    ph->hasStarted = true;
-
+    // Preallocate memory for arrays
     IntGroup *grp = new IntGroup(CPU_GRP_SIZE);
     Int *dx = new Int[CPU_GRP_SIZE];
     Int dy, rx, ry, _s, _p;
@@ -318,6 +310,19 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     Int **distances = new Int*[CPU_GRP_SIZE];
     bool *isDPs = new bool[CPU_GRP_SIZE];
 
+    // Create Kangaroos if not already loaded
+    if (ph->px == nullptr) {
+        ph->px = new Int[CPU_GRP_SIZE];
+        ph->py = new Int[CPU_GRP_SIZE];
+        ph->distance = new Int[CPU_GRP_SIZE];
+        CreateHerd(CPU_GRP_SIZE, ph->px, ph->py, ph->distance, TAME);
+    }
+
+    if (keyIdx == 0)
+        ::printf("SolveKeyCPU Thread %d: %d kangaroos\n", ph->threadId, CPU_GRP_SIZE);
+
+    ph->hasStarted = true;
+
     while (!endOfSearch) {
         // Calculate jumps and initialize pointers
         for (int g = 0; g < CPU_GRP_SIZE; g++) {
@@ -328,14 +333,10 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             p2ys[g] = &ph->py[g];
             distances[g] = &jumpDistance[jmps[g]];
             dx[g].ModSub(p2xs[g], p1xs[g]);
+            isDPs[g] = IsDP(ph->px[g].bits64[3]);
         }
         grp->Set(dx);
         grp->ModInv();
-
-        // Calculate isDPs outside the loop
-        for (int g = 0; g < CPU_GRP_SIZE; g++) {
-            isDPs[g] = IsDP(ph->px[g].bits64[3]);
-        }
 
         for (int g = 0; g < CPU_GRP_SIZE; g++) {
             dy.ModSub(p2ys[g], p1ys[g]);
@@ -400,7 +401,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
         }
     }
 
-    // Free
+    // Free allocated memory
     delete grp;
     delete[] dx;
     delete[] jmps;
