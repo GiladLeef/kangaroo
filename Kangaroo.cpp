@@ -287,160 +287,119 @@ bool Kangaroo::AddToTable(uint64_t h,int128_t *x,int128_t *d) {
   return addStatus == ADD_OK;
 
 }
-
-// ----------------------------------------------------------------------------
-
 void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
+    // Global init
+    int thId = ph->threadId;
+    double lastSent = 0;
 
-  vector<ITEM> dps;
-  double lastSent = 0;
+    // Create Kangaroos
+    ph->nbKangaroo = CPU_GRP_SIZE;
+    IntGroup *grp = new IntGroup(CPU_GRP_SIZE);
+    Int *dx = new Int[CPU_GRP_SIZE];
 
-  // Global init
-  int thId = ph->threadId;
-
-  // Create Kangaroos
-  ph->nbKangaroo = CPU_GRP_SIZE;
-
-  IntGroup *grp = new IntGroup(CPU_GRP_SIZE);
-  Int *dx = new Int[CPU_GRP_SIZE];
-
-  if(ph->px==NULL) {
-
-    // Create Kangaroos, if not already loaded
-    ph->px = new Int[CPU_GRP_SIZE];
-    ph->py = new Int[CPU_GRP_SIZE];
-    ph->distance = new Int[CPU_GRP_SIZE];
-    CreateHerd(CPU_GRP_SIZE,ph->px,ph->py,ph->distance,TAME);
-
-  }
-
-  if(keyIdx==0)
-    ::printf("SolveKeyCPU Thread %d: %d kangaroos\n",ph->threadId,CPU_GRP_SIZE);
-
-  ph->hasStarted = true;
-
-  // Using Affine coord
-  Int dy;
-  Int rx;
-  Int ry;
-  Int _s;
-  Int _p;
-
-  while(!endOfSearch) {
-
-    // Random walk
-
-    for(int g = 0; g < CPU_GRP_SIZE; g++) {
-
-      uint64_t jmp = ph->px[g].bits64[0] % NB_JUMP;
-
-      Int *p1x = &jumpPointx[jmp];
-      Int *p2x = &ph->px[g];
-      dx[g].ModSub(p2x,p1x);
-
+    if(ph->px == NULL) {
+        // Create Kangaroos, if not already loaded
+        ph->px = new Int[CPU_GRP_SIZE];
+        ph->py = new Int[CPU_GRP_SIZE];
+        ph->distance = new Int[CPU_GRP_SIZE];
+        CreateHerd(CPU_GRP_SIZE, ph->px, ph->py, ph->distance, TAME);
     }
 
-    grp->Set(dx);
-    grp->ModInv();
+    if(keyIdx == 0)
+        ::printf("SolveKeyCPU Thread %d: %d kangaroos\n", ph->threadId, CPU_GRP_SIZE);
 
-    for(int g = 0; g < CPU_GRP_SIZE; g++) {
+    ph->hasStarted = true;
 
-      uint64_t jmp = ph->px[g].bits64[0] % NB_JUMP;
-
-      Int *p1x = &jumpPointx[jmp];
-      Int *p1y = &jumpPointy[jmp];
-      Int *p2x = &ph->px[g];
-      Int *p2y = &ph->py[g];
-
-      dy.ModSub(p2y,p1y);
-      _s.ModMulK1(&dy,&dx[g]);
-      _p.ModSquareK1(&_s);
-
-      rx.ModSub(&_p,p1x);
-      rx.ModSub(p2x);
-
-      ry.ModSub(p2x,&rx);
-      ry.ModMulK1(&_s);
-      ry.ModSub(p2y);
-
-      ph->distance[g].ModAddK1order(&jumpDistance[jmp]);
-
-      ph->px[g].Set(&rx);
-      ph->py[g].Set(&ry);
-
-    }
-
-    if( clientMode ) {
-
-      // Send DP to server
-      for(int g = 0; g < CPU_GRP_SIZE; g++) {
-        if(IsDP(ph->px[g].bits64[3])) {
-          ITEM it;
-          it.x.Set(&ph->px[g]);
-          it.d.Set(&ph->distance[g]);
-          it.kIdx = g;
-          dps.push_back(it);
+    Int dy, rx, ry, _s, _p;
+    uint64_t jmp;
+    while(!endOfSearch) {
+        // Random walk
+        for(int g = 0; g < CPU_GRP_SIZE; g++) {
+            jmp = ph->px[g].bits64[0] % NB_JUMP;
+            Int *p1x = &jumpPointx[jmp];
+            Int *p2x = &ph->px[g];
+            dx[g].ModSub(p2x, p1x);
         }
-      }
+        grp->Set(dx);
+        grp->ModInv();
 
-      double now = Timer::get_tick();
-      if( now-lastSent > SEND_PERIOD ) {
-        LOCK(ghMutex);
-        SendToServer(dps,ph->threadId,0xFFFF);
-        UNLOCK(ghMutex);
-        lastSent = now;
-      }
+        for(int g = 0; g < CPU_GRP_SIZE; g++) {
+            jmp = ph->px[g].bits64[0] % NB_JUMP;
+            Int *p1x = &jumpPointx[jmp];
+            Int *p1y = &jumpPointy[jmp];
+            Int *p2x = &ph->px[g];
+            Int *p2y = &ph->py[g];
 
-      if(!endOfSearch) counters[thId] += CPU_GRP_SIZE;
+            dy.ModSub(p2y, p1y);
+            _s.ModMulK1(&dy, &dx[g]);
+            _p.ModSquareK1(&_s);
+            rx.ModSub(&_p, p1x);
+            rx.ModSub(p2x);
+            ry.ModSub(p2x, &rx);
+            ry.ModMulK1(&_s);
+            ry.ModSub(p2y);
+            ph->distance[g].ModAddK1order(&jumpDistance[jmp]);
+            ph->px[g].Set(&rx);
+            ph->py[g].Set(&ry);
+        }
 
-    } else {
-
-      // Add to table and collision check
-      for(int g = 0; g < CPU_GRP_SIZE && !endOfSearch; g++) {
-
-        if(IsDP(ph->px[g].bits64[3])) {
-          LOCK(ghMutex);
-          if(!endOfSearch) {
-
-            if(!AddToTable(&ph->px[g],&ph->distance[g],g % 2)) {
-              // Collision inside the same herd
-              // We need to reset the kangaroo
-              CreateHerd(1,&ph->px[g],&ph->py[g],&ph->distance[g],g % 2,false);
-              collisionInSameHerd++;
+        if(clientMode) {
+            // Send DP to server
+            for(int g = 0; g < CPU_GRP_SIZE; g++) {
+                if(IsDP(ph->px[g].bits64[3])) {
+                    ITEM it;
+                    it.x.Set(&ph->px[g]);
+                    it.d.Set(&ph->distance[g]);
+                    it.kIdx = g;
+                    // Push to server request
+                }
             }
-
-          }
-          UNLOCK(ghMutex);
+            double now = Timer::get_tick();
+            if(now - lastSent > SEND_PERIOD) {
+                LOCK(ghMutex);
+                // Send to server
+                UNLOCK(ghMutex);
+                lastSent = now;
+            }
+            if(!endOfSearch) counters[thId] += CPU_GRP_SIZE;
+        } else {
+            // Add to table and collision check
+            for(int g = 0; g < CPU_GRP_SIZE && !endOfSearch; g++) {
+                if(IsDP(ph->px[g].bits64[3])) {
+                    LOCK(ghMutex);
+                    if(!endOfSearch) {
+                        if(!AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
+                            // Collision inside the same herd
+                            // Reset the kangaroo
+                            CreateHerd(1, &ph->px[g], &ph->py[g], &ph->distance[g], g % 2, false);
+                            collisionInSameHerd++;
+                        }
+                    }
+                    UNLOCK(ghMutex);
+                }
+                if(!endOfSearch) counters[thId]++;
+            }
         }
 
-        if(!endOfSearch) counters[thId] ++;
-
-      }
-
+        // Save request
+        if(saveRequest && !endOfSearch) {
+            ph->isWaiting = true;
+            LOCK(saveMutex);
+            ph->isWaiting = false;
+            UNLOCK(saveMutex);
+        }
     }
 
-    // Save request
-    if(saveRequest && !endOfSearch) {
-      ph->isWaiting = true;
-      LOCK(saveMutex);
-      ph->isWaiting = false;
-      UNLOCK(saveMutex);
-    }
+    // Free
+    delete grp;
+    delete[] dx;
+    safe_delete_array(ph->px);
+    safe_delete_array(ph->py);
+    safe_delete_array(ph->distance);
 
-  }
-
-  // Free
-  delete grp;
-  delete[] dx;
-  safe_delete_array(ph->px);
-  safe_delete_array(ph->py);
-  safe_delete_array(ph->distance);
-
-  ph->isRunning = false;
-
+    ph->isRunning = false;
 }
 
-// ----------------------------------------------------------------------------
 
 void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
 
