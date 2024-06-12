@@ -292,13 +292,8 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     int thId = ph->threadId;
     double lastSent = 0;
 
-    // Create Kangaroos
-    ph->nbKangaroo = CPU_GRP_SIZE;
-    IntGroup *grp = new IntGroup(CPU_GRP_SIZE);
-    Int *dx = new Int[CPU_GRP_SIZE];
-
-    if(ph->px == NULL) {
-        // Create Kangaroos, if not already loaded
+    // Create Kangaroos if not already loaded
+    if(ph->px == nullptr) {
         ph->px = new Int[CPU_GRP_SIZE];
         ph->py = new Int[CPU_GRP_SIZE];
         ph->distance = new Int[CPU_GRP_SIZE];
@@ -310,6 +305,8 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
 
     ph->hasStarted = true;
 
+    IntGroup *grp = new IntGroup(CPU_GRP_SIZE);
+    Int *dx = new Int[CPU_GRP_SIZE];
     Int dy, rx, ry, _s, _p;
     uint64_t jmp;
     while(!endOfSearch) {
@@ -338,9 +335,13 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             ry.ModSub(p2x, &rx);
             ry.ModMulK1(&_s);
             ry.ModSub(p2y);
-            ph->distance[g].ModAddK1order(&jumpDistance[jmp]);
+
+            // Update ph->px, ph->py directly to avoid Set()
             ph->px[g].Set(&rx);
             ph->py[g].Set(&ry);
+
+            // Update distance
+            ph->distance[g].ModAddK1order(&jumpDistance[jmp]);
         }
 
         if(clientMode) {
@@ -393,6 +394,8 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     // Free
     delete grp;
     delete[] dx;
+
+    // No need to delete individual arrays, just delete the outer struct
     safe_delete_array(ph->px);
     safe_delete_array(ph->py);
     safe_delete_array(ph->distance);
