@@ -1,4 +1,4 @@
-## Pollard's Kangaroo for SECPK1
+## Pollard's Kangaroo for SECP256K1
 
 Pollard's Kangaroo algorithm offers a powerful solution for tackling the Elliptic Curve Discrete Logarithm Problem (ECDLP) within the context of SECPK1. Here's a detailed overview of the features and functionality of this solver:
 
