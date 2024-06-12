@@ -308,40 +308,43 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     IntGroup *grp = new IntGroup(CPU_GRP_SIZE);
     Int *dx = new Int[CPU_GRP_SIZE];
     Int dy, rx, ry, _s, _p;
-    uint64_t jmp;
+    uint64_t *jmps = new uint64_t[CPU_GRP_SIZE];
+    Int **p1xs = new Int*[CPU_GRP_SIZE];
+    Int **p1ys = new Int*[CPU_GRP_SIZE];
+    Int **p2xs = new Int*[CPU_GRP_SIZE];
+    Int **p2ys = new Int*[CPU_GRP_SIZE];
+    Int **distances = new Int*[CPU_GRP_SIZE];
+
     while(!endOfSearch) {
-        // Random walk
+        // Calculate jumps and initialize pointers
         for(int g = 0; g < CPU_GRP_SIZE; g++) {
-            jmp = ph->px[g].bits64[0] % NB_JUMP;
-            Int *p1x = &jumpPointx[jmp];
-            Int *p2x = &ph->px[g];
-            dx[g].ModSub(p2x, p1x);
+            jmps[g] = ph->px[g].bits64[0] % NB_JUMP;
+            p1xs[g] = &jumpPointx[jmps[g]];
+            p1ys[g] = &jumpPointy[jmps[g]];
+            p2xs[g] = &ph->px[g];
+            p2ys[g] = &ph->py[g];
+            distances[g] = &jumpDistance[jmps[g]];
+            dx[g].ModSub(p2xs[g], p1xs[g]);
         }
         grp->Set(dx);
         grp->ModInv();
 
         for(int g = 0; g < CPU_GRP_SIZE; g++) {
-            jmp = ph->px[g].bits64[0] % NB_JUMP;
-            Int *p1x = &jumpPointx[jmp];
-            Int *p1y = &jumpPointy[jmp];
-            Int *p2x = &ph->px[g];
-            Int *p2y = &ph->py[g];
-
-            dy.ModSub(p2y, p1y);
+            dy.ModSub(p2ys[g], p1ys[g]);
             _s.ModMulK1(&dy, &dx[g]);
             _p.ModSquareK1(&_s);
-            rx.ModSub(&_p, p1x);
-            rx.ModSub(p2x);
-            ry.ModSub(p2x, &rx);
+            rx.ModSub(&_p, p1xs[g]);
+            rx.ModSub(p2xs[g]);
+            ry.ModSub(p2xs[g], &rx);
             ry.ModMulK1(&_s);
-            ry.ModSub(p2y);
+            ry.ModSub(p2ys[g]);
 
             // Update ph->px, ph->py directly to avoid Set()
             ph->px[g].Set(&rx);
             ph->py[g].Set(&ry);
 
             // Update distance
-            ph->distance[g].ModAddK1order(&jumpDistance[jmp]);
+            ph->distance[g].ModAddK1order(distances[g]);
         }
 
         if(clientMode) {
@@ -394,6 +397,12 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     // Free
     delete grp;
     delete[] dx;
+    delete[] jmps;
+    delete[] p1xs;
+    delete[] p1ys;
+    delete[] p2xs;
+    delete[] p2ys;
+    delete[] distances;
 
     // No need to delete individual arrays, just delete the outer struct
     safe_delete_array(ph->px);
