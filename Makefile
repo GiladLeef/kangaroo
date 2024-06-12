@@ -35,7 +35,7 @@ OBJET = $(addprefix $(OBJDIR)/, \
 endif
 
 CXX        = g++
-CUDA       = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.3"
+CUDA       = "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5"
 NVCC       = $(CUDA)/bin/nvcc
 
 ifdef gpu
