@@ -8,7 +8,7 @@ Pollard's Kangaroo algorithm offers a powerful solution for tackling the Ellipti
 - **Fast modular inversion:** Implements fast modular inversion using Delayed Right Shift 62 bits.
 - **Fast modular multiplication:** Utilizes 2 steps folding 512 bits to 256 bits reduction using 64-bit digits.
 - **Multi-GPU support:** Supports multi-GPU usage for parallel processing.
-- **CUDA optimization:** CUDA implementation through inline PTX assembly for enhanced performance.
+- **CUDA optimization:** CUDA optimization through inline PTX assembly for enhanced performance.
 
 ### Input File Structure
 
