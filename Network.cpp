@@ -2,36 +2,20 @@
 #include <fstream>
 #include "SECPK1/IntGroup.h"
 #include "Timer.h"
-#include <iostream>
-#include <cstring>
-
-// Include platform-specific headers
-#ifdef _WIN32
-    // Windows headers
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #include <io.h> // For _setmode()
-    #include <fcntl.h> // For _O_BINARY
-    #pragma comment(lib, "ws2_32.lib") // Link with ws2_32.lib
-#else
-    // Unix/Linux headers
-    #include <sys/types.h>
-    #include <sys/socket.h>
-    #include <unistd.h>
-    #include <fcntl.h>
-    #include <signal.h>
-#endif
-
-#include <cmath>
+#include <string.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
 #include <algorithm>
-#include <string>
-#include <cerrno> // for errno
-#include <cstdlib> // for exit()
-#include <cstdio> // for printf
+#include <signal.h>
+#ifndef WIN64
+#include <pthread.h>
+#else
+#include "WinErrors.h"
+#endif
 
 using namespace std;
 
-static int serverSock = 0; // Use int for socket descriptor on Unix/Linux
+static SOCKET serverSock = 0;
 
 // ------------------------------------------------------------------------------------------------------
 // Common part
@@ -61,27 +45,59 @@ static int serverSock = 0; // Use int for socket descriptor on Unix/Linux
 #define SERVER_END           1
 #define SERVER_BACKUP        2
 
-#ifdef _WIN32
-    #define close_socket(s) closesocket(s)
-#else
-    #define close_socket(s) close(s)
-#endif
+
+#ifdef WIN64
+
+#define close_socket(s) closesocket(s)
+
+typedef int socklen_t;
 
 string GetNetworkError() {
-    return string(strerror(errno));
+
+  int err = WSAGetLastError();
+  bool found = false;
+  int i=0;
+  while(!found && i<NBWSAERRORS) {
+    found = (WSAERRORS[i].errCode == err);
+    if(!found) i++;
+  }
+
+  if(!found) {
+    char ret[256];
+    sprintf(ret,"WSA Error code %d",err);
+    return string(ret);
+  } else {
+    return string(WSAERRORS[i].mesg);
+  }
+
 }
 
-#define GET(name,s,b,bl,t)  if( (nbRead=Read(s,(char *)(b),bl,t))<0 ) { ::printf("\nReadError(" name "): %s\n", GetNetworkError().c_str()); isConnected = false; close_socket(s); return false; }
-#define PUT(name,s,b,bl,t)  if( (nbWrite=Write(s,(char *)(b),bl,t))<0 ) { ::printf("\nWriteError(" name "): %s\n", GetNetworkError().c_str()); isConnected = false; close_socket(s); return false; }
-#define GETFREE(name,s,b,bl,t,x)  if( (nbRead=Read(s,(char *)(b),bl,t))<0 ) { ::printf("\nReadError(" name "): %s\n", GetNetworkError().c_str()); isConnected = false; ::free(x); close_socket(s); return false; }
-#define PUTFREE(name,s,b,bl,t,x)  if( (nbWrite=Write(s,(char *)(b),bl,t))<0 ) { ::printf("\nWriteError(" name "): %s\n", GetNetworkError().c_str()); isConnected = false; ::free(x); close_socket(s); return false; }
+#else
+
+#define close_socket(s) close(s)
+
+string GetNetworkError() {
+
+  return string(strerror(errno));
+
+}
+
+#endif
+
+#define GET(name,s,b,bl,t)  if( (nbRead=Read(s,(char *)(b),bl,t))<0 ) { ::printf("\nReadError(" name "): %s\n",lastError.c_str()); isConnected = false; close_socket(s); return false; }
+#define PUT(name,s,b,bl,t)  if( (nbWrite=Write(s,(char *)(b),bl,t))<0 ) { ::printf("\nWriteError(" name "): %s\n",lastError.c_str()); isConnected = false; close_socket(s); return false; }
+#define GETFREE(name,s,b,bl,t,x)  if( (nbRead=Read(s,(char *)(b),bl,t))<0 ) { ::printf("\nReadError(" name "): %s\n",lastError.c_str()); isConnected = false; ::free(x); close_socket(s); return false; }
+#define PUTFREE(name,s,b,bl,t,x)  if( (nbWrite=Write(s,(char *)(b),bl,t))<0 ) { ::printf("\nWriteError(" name "): %s\n",lastError.c_str()); isConnected = false; ::free(x); close_socket(s); return false; }
 
 void sig_handler(int signo) {
-    if(signo == SIGINT) {
-        ::printf("\nTerminated\n");
-        if(serverSock>0) close_socket(serverSock);
-        exit(0);
-    }
+  if(signo == SIGINT) {
+    ::printf("\nTerminated\n");
+    if(serverSock>0) close_socket(serverSock);
+#ifdef WIN64
+    WSACleanup();
+#endif
+    exit(0);
+  }
 }
 
 int Kangaroo::WaitFor(SOCKET sock,int timeout,int mode) {
@@ -103,7 +119,11 @@ int Kangaroo::WaitFor(SOCKET sock,int timeout,int mode) {
 
   do
     result = select((int)sock + 1,rd,wr,NULL,&tmout);
+#ifdef WIN64
+  while(result < 0 && WSAGetLastError() == WSAEINTR);
+#else
   while(result < 0 && errno == EINTR);
+#endif
 
   if(result == 0) {
     lastError = "The operation timed out";
@@ -130,7 +150,12 @@ int Kangaroo::Write(SOCKET sock,char *buf,int bufsize,int timeout) {
     // Write
     do
       written = send(sock,buf,bufsize,0);
+#ifdef WIN64
+    while(written == -1 && WSAGetLastError() == WSAEINTR);
+#else
     while(written == -1 && errno == EINTR);
+#endif
+
     if(written <= 0)
       break;
 
@@ -168,7 +193,11 @@ int Kangaroo::Read(SOCKET sock,char *buf,int bufsize,int timeout) { // Timeout i
     // Read
     do
       rd = recv(sock,buf,bufsize,0);
+#ifdef WIN64
+    while(rd == -1 && WSAGetLastError() == WSAEINTR);
+#else
     while(rd == -1 && errno == EINTR);
+#endif
     if( rd <= 0 )
       break;
 
@@ -189,6 +218,20 @@ int Kangaroo::Read(SOCKET sock,char *buf,int bufsize,int timeout) { // Timeout i
   }
 
   return total_read;
+
+}
+
+void Kangaroo::InitSocket() {
+
+#ifdef WIN64
+  // connect to Winscok DLL
+  WSADATA WSAData;
+  int err = WSAStartup(MAKEWORD(2,2),&WSAData);
+  if(err != 0) { 
+    ::printf("WSAStartup failed error : %d\n",err);
+    exit(-1);
+  }
+#endif
 
 }
 
@@ -484,6 +527,47 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
 
         } else {
 
+//#define VALIDITY_POINT_CHECK
+#ifdef VALIDITY_POINT_CHECK
+          // Check validity
+          for(uint32_t i=0;i< head.nbDP;i++) {
+            
+            uint64_t h = (uint64_t)dp[i].h;
+            if(h >= HASH_SIZE) {
+              ::printf("\nInvalid data from: %s [dp=%d PID=%u thId=%u gpuId=%u]\n",p->clientInfo,i,
+                                                            head.processId,head.threadId,head.gpuId);
+              free(dp);
+              CLIENT_ABORT();
+            }
+
+            Int dist;
+            uint32_t kType;
+            HashTable::CalcDistAndType(dp[i].d,&dist,&kType);
+            Point P = secp->ComputePublicKey(&dist);
+
+            if(kType == WILD)
+              P = secp->AddDirect(keyToSearch,P);
+
+            uint32_t hC = P.x.bits64[2] & HASH_MASK;
+            bool ok = (hC == h) && (P.x.bits64[0] == dp[i].x.i64[0]) && (P.x.bits64[1] == dp[i].x.i64[1]);
+            if(!ok) {
+              if(kType==TAME) {
+                ::printf("\nWrong TAME point from: %s [dp=%d PID=%u thId=%u gpuId=%u]\n",p->clientInfo,i,
+                  head.processId,head.threadId,head.gpuId);
+              } else {
+                ::printf("\nWrong WILD point from: %s [dp=%d PID=%u thId=%u gpuId=%u]\n",p->clientInfo,i,
+                  head.processId,head.threadId,head.gpuId);
+              }
+              //::printf("X=%s\n",P.x.GetBase16().c_str());
+              //::printf("X=%08X%08X%08X%08X\n",dp[i].x.i32[3],dp[i].x.i32[2],dp[i].x.i32[1],dp[i].x.i32[0]);
+              //::printf("D=%08X%08X%08X%08X\n",dp[i].d.i32[3],dp[i].d.i32[2],dp[i].d.i32[1],dp[i].d.i32[0]);
+              free(dp);
+              CLIENT_ABORT();
+            }
+
+          }
+#endif
+
           LOCK(ghMutex);
           DP_CACHE dc;
           dc.nbDP = head.nbDP;
@@ -510,7 +594,7 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
 
 }
 
-// Threaded proc
+
 void *_acceptThread(void *lpParam) {
   TH_PARAM *p = (TH_PARAM *)lpParam;
   p->obj->AddConnectedClient();
@@ -522,6 +606,7 @@ void *_acceptThread(void *lpParam) {
   free(p);
   return 0;
 }
+
 
 void *_processServer(void *lpParam) {
   Kangaroo *obj = (Kangaroo *)lpParam;
@@ -551,7 +636,11 @@ void Kangaroo::AcceptConnections(SOCKET server_soc) {
       ::memset(p,0,sizeof(TH_PARAM));
       char info[256];
       ::sprintf(info,"%s:%d",inet_ntoa(client_add.sin_addr),ntohs(client_add.sin_port));
+#ifdef WIN64
+      p->clientInfo = ::_strdup(info);
+#else
       p->clientInfo = ::strdup(info);
+#endif
       p->obj = this;
       p->isRunning = true;
       p->clientSock = clientSock;
@@ -602,6 +691,9 @@ void Kangaroo::RunServer() {
   LaunchThread(_processServer,(TH_PARAM *)this);
   Timer::SleepMillis(100);
 
+  // Server stuff
+
+  InitSocket();
 
   /* Create socket */
   serverSock = socket(AF_INET,SOCK_STREAM,0);
@@ -636,6 +728,10 @@ void Kangaroo::RunServer() {
 
   AcceptConnections(serverSock);
 
+#ifdef WIN64
+  WSACleanup();
+#endif
+
   return;
 
 }
@@ -643,114 +739,127 @@ void Kangaroo::RunServer() {
 // ------------------------------------------------------------------------------------------------------
 // Client part
 // ------------------------------------------------------------------------------------------------------
+
 // Connection to the server
 bool Kangaroo::ConnectToServer(SOCKET *retSock) {
-    lastError = "";
 
-    // Resolve IP
-    if (!hostInfo) {
-        if (signal(SIGINT, sig_handler) == SIG_ERR)
-            ::printf("\nWarning: can't install signal handler\n");
+  lastError = "";
 
-        struct hostent *host_info;
-        host_info = gethostbyname(serverIp.c_str());
-        if (host_info == NULL) {
-            lastError = "Unknown host:" + serverIp;
-            hostInfo = NULL;
-            hostInfoLength = 0;
-            return false;
-        } else {
-            hostInfoLength = host_info->h_length;
-            hostInfo = (char *)malloc(hostInfoLength);
-            ::memcpy(hostInfo, host_info->h_addr, hostInfoLength);
-            hostAddrType = host_info->h_addrtype;
-        }
+  // Resolve IP
+  if(!hostInfo) {
+
+    if(signal(SIGINT,sig_handler) == SIG_ERR)
+      ::printf("\nWarning:can't install singal handler\n");
+
+    InitSocket();
+
+    struct hostent *host_info;
+    host_info = gethostbyname(serverIp.c_str());
+    if(host_info == NULL) {
+      lastError = "Unknown host:" + serverIp;
+      hostInfo = NULL;
+      hostInfoLength = 0;
+      return false;
+    } else {
+      hostInfoLength = host_info->h_length;
+      hostInfo = (char *)malloc(hostInfoLength);
+      ::memcpy(hostInfo,host_info->h_addr,hostInfoLength);
+      hostAddrType = host_info->h_addrtype;
     }
 
-    struct sockaddr_in server;
+  }
 
-    // Build TCP connection
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (sock < 0) {
-        lastError = "Socket error: " + GetNetworkError();
-        return false;
+  struct sockaddr_in server;
+
+  // Build TCP connection
+  SOCKET sock = socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
+  if(sock < 0) {
+    lastError = "Socket error: " + GetNetworkError();
+    return false;
+  }
+
+  // Use non blocking socket
+#ifdef WIN64
+  unsigned long iMode = 0;
+  if(ioctlsocket(sock,FIONBIO,&iMode) != 0) {
+#else
+  if(fcntl(sock,F_SETFL,O_NONBLOCK) == -1) {
+#endif
+    lastError = "Cannot use non blocking socket, " + GetNetworkError();
+    close_socket(sock);
+    return false;
+  }
+
+  // Connect
+  ::memset(&server,0,sizeof(sockaddr_in));
+  server.sin_family = hostAddrType;
+  ::memcpy((char*)&server.sin_addr,hostInfo,hostInfoLength);
+  server.sin_port = htons(port);
+
+  int connectStatus = connect(sock,(struct sockaddr *)&server,sizeof(server));
+
+#ifdef WIN64
+  if((connectStatus < 0) && (WSAGetLastError() != WSAEINPROGRESS)) {
+#else
+  if((connectStatus < 0) && (errno != EINPROGRESS)) {
+#endif
+    lastError = "Cannot connect to host: " + GetNetworkError();
+    close_socket(sock);
+    return false;
+  }
+
+  if(connectStatus<0) {
+
+    // Wait for connection
+    if(!WaitFor(sock,ntimeout,WAIT_FOR_WRITE)) {
+      lastError = "Cannot connect, unreachable host " + serverIp;
+      close_socket(sock);
+      return false;
     }
 
-    // Use non-blocking socket
-    #ifdef _WIN32
-        u_long mode = 1; // Set non-blocking mode
-        if (ioctlsocket(sock, FIONBIO, &mode) != 0) {
-            lastError = "Cannot use non-blocking socket, " + GetNetworkError();
-            close_socket(sock);
-            return false;
-        }
-    #else
-        // Unix/Linux
-        if (fcntl(sock, F_SETFL, O_NONBLOCK) == -1) {
-            lastError = "Cannot use non-blocking socket, " + GetNetworkError();
-            close_socket(sock);
-            return false;
-        }
-    #endif
-
-    // Connect
-    ::memset(&server, 0, sizeof(sockaddr_in));
-    server.sin_family = hostAddrType;
-    ::memcpy((char*)&server.sin_addr, hostInfo, hostInfoLength);
-    server.sin_port = htons(port);
-
-    int connectStatus = connect(sock, (struct sockaddr *)&server, sizeof(server));
-
-    if ((connectStatus < 0) && (errno != EINPROGRESS)) {
-        lastError = "Cannot connect to host: " + GetNetworkError();
-        close_socket(sock);
-        return false;
+    // Check connection completion
+    int socket_err;
+#ifdef WIN64
+    int serrlen = sizeof socket_err;
+    if(getsockopt(sock,SOL_SOCKET,SO_ERROR,(char *)&socket_err,&serrlen) != 0) {
+#else
+    socklen_t serrlen = sizeof(socket_err);
+    if(getsockopt(sock,SOL_SOCKET,SO_ERROR,&socket_err,&serrlen) == -1) {
+#endif
+      lastError = "Cannot connect to host: " + GetNetworkError();
+      close_socket(sock);
+      return false;
     }
 
-    if (connectStatus < 0) {
-        // Wait for connection
-        if (!WaitFor(sock, ntimeout, WAIT_FOR_WRITE)) {
-            lastError = "Cannot connect, unreachable host " + serverIp;
-            close_socket(sock);
-            return false;
-        }
-
-        // Check connection completion
-        int socket_err;
-        socklen_t serrlen = sizeof(socket_err);
-        if (getsockopt(sock, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&socket_err), &serrlen) == -1) {
-            lastError = "Cannot connect to host: " + GetNetworkError();
-            close_socket(sock);
-            return false;
-        }
-
-        if (socket_err != 0) {
-            lastError = "Cannot connect to host: " + string(strerror(socket_err));
-            close_socket(sock);
-            return false;
-        }
+    if(socket_err != 0) {
+      lastError = "Cannot connect to host: " + string(strerror(socket_err));
+      close_socket(sock);
+      return false;
     }
 
-    int on = 1;
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&on, sizeof(on)) == -1) {
-        lastError = "Socket error: setsockopt error SO_REUSEADDR";
-        close_socket(sock);
-        return false;
-    }
+  }
 
-    int flag = 1;
-    struct protoent *p;
-    p = getprotobyname("tcp");
-    if (setsockopt(sock, p->p_proto, TCP_NODELAY, (char *)&flag, sizeof(flag)) == -1) {
-        lastError = "Socket error: setsockopt error TCP_NODELAY";
-        close_socket(sock);
-        return false;
-    }
+  int on = 1;
+  if(setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,
+    (const char*)&on,sizeof(on)) == -1) {
+    lastError = "Socket error: setsockopt error SO_REUSEADDR";
+    close_socket(sock);
+    return false;
+  }
 
-    *retSock = sock;
-    return true;
+  int flag = 1;
+  struct protoent *p;
+  p = getprotobyname("tcp");
+  if(setsockopt(sock,p->p_proto,TCP_NODELAY,(char *)&flag,sizeof(flag)) == -1) {
+    lastError = "Socket error: setsockopt error TCP_NODELAY";
+    close_socket(sock);
+    return false;
+  }
+
+  *retSock = sock;
+  return true;
+
 }
-
 
 // Wait while server is not ready
 void Kangaroo::WaitForServer() {
