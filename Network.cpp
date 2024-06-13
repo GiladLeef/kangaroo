@@ -2,8 +2,8 @@
 #include <fstream>
 #include "SECPK1/IntGroup.h"
 #include "Timer.h"
-#include <string.h>
 #include <iostream>
+#include <cstring>
 
 // Include platform-specific headers
 #ifdef _WIN32
@@ -19,17 +19,19 @@
     #include <sys/socket.h>
     #include <unistd.h>
     #include <fcntl.h>
+    #include <signal.h>
 #endif
 
-#include <math.h>
+#include <cmath>
 #include <algorithm>
-#include <signal.h>
-#include <pthread.h>
+#include <string>
+#include <cerrno> // for errno
+#include <cstdlib> // for exit()
+#include <cstdio> // for printf
 
 using namespace std;
 
-
-static SOCKET serverSock = 0;
+static int serverSock = 0; // Use int for socket descriptor on Unix/Linux
 
 // ------------------------------------------------------------------------------------------------------
 // Common part
@@ -59,25 +61,27 @@ static SOCKET serverSock = 0;
 #define SERVER_END           1
 #define SERVER_BACKUP        2
 
-#define close_socket(s) close(s)
+#ifdef _WIN32
+    #define close_socket(s) closesocket(s)
+#else
+    #define close_socket(s) close(s)
+#endif
 
 string GetNetworkError() {
-
-  return string(strerror(errno));
-
+    return string(strerror(errno));
 }
 
-#define GET(name,s,b,bl,t)  if( (nbRead=Read(s,(char *)(b),bl,t))<0 ) { ::printf("\nReadError(" name "): %s\n",lastError.c_str()); isConnected = false; close_socket(s); return false; }
-#define PUT(name,s,b,bl,t)  if( (nbWrite=Write(s,(char *)(b),bl,t))<0 ) { ::printf("\nWriteError(" name "): %s\n",lastError.c_str()); isConnected = false; close_socket(s); return false; }
-#define GETFREE(name,s,b,bl,t,x)  if( (nbRead=Read(s,(char *)(b),bl,t))<0 ) { ::printf("\nReadError(" name "): %s\n",lastError.c_str()); isConnected = false; ::free(x); close_socket(s); return false; }
-#define PUTFREE(name,s,b,bl,t,x)  if( (nbWrite=Write(s,(char *)(b),bl,t))<0 ) { ::printf("\nWriteError(" name "): %s\n",lastError.c_str()); isConnected = false; ::free(x); close_socket(s); return false; }
+#define GET(name,s,b,bl,t)  if( (nbRead=Read(s,(char *)(b),bl,t))<0 ) { ::printf("\nReadError(" name "): %s\n", GetNetworkError().c_str()); isConnected = false; close_socket(s); return false; }
+#define PUT(name,s,b,bl,t)  if( (nbWrite=Write(s,(char *)(b),bl,t))<0 ) { ::printf("\nWriteError(" name "): %s\n", GetNetworkError().c_str()); isConnected = false; close_socket(s); return false; }
+#define GETFREE(name,s,b,bl,t,x)  if( (nbRead=Read(s,(char *)(b),bl,t))<0 ) { ::printf("\nReadError(" name "): %s\n", GetNetworkError().c_str()); isConnected = false; ::free(x); close_socket(s); return false; }
+#define PUTFREE(name,s,b,bl,t,x)  if( (nbWrite=Write(s,(char *)(b),bl,t))<0 ) { ::printf("\nWriteError(" name "): %s\n", GetNetworkError().c_str()); isConnected = false; ::free(x); close_socket(s); return false; }
 
 void sig_handler(int signo) {
-  if(signo == SIGINT) {
-    ::printf("\nTerminated\n");
-    if(serverSock>0) close_socket(serverSock);
-    exit(0);
-  }
+    if(signo == SIGINT) {
+        ::printf("\nTerminated\n");
+        if(serverSock>0) close_socket(serverSock);
+        exit(0);
+    }
 }
 
 int Kangaroo::WaitFor(SOCKET sock,int timeout,int mode) {
