@@ -747,6 +747,7 @@ void Kangaroo::Run(int nbThread, std::vector<int> gpuId, std::vector<int> gridSi
         int x = gridSize[2ULL * i];
         int y = gridSize[2ULL * i + 1ULL];
         if (!GPUEngine::GetGridSize(gpuId[i], &x, &y)) {
+            free(thHandles);
             return;
         }
         else {
