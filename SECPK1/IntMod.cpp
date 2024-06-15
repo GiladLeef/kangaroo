@@ -18,47 +18,32 @@ static uint64_t MM64;     // 64bits lsb negative inverse of P
 
 extern Int _ONE;
 
-// ------------------------------------------------
-
-void Int::ModAdd(Int *a) {
+// Define ModAddHelper
+template<typename Func>
+void Int::ModAddHelper(Func addFunc) {
   Int p;
-  Add(a);
-  p.Sub(this,&_P);
-  if(p.IsPositive())
+  addFunc();
+  p.Sub(this, &_P);
+  if (p.IsPositive())
     Set(&p);
 }
 
-// ------------------------------------------------
+// Define the rest of your member functions here
+void Int::ModAdd(Int *a) {
+  ModAddHelper([this, a]() { Add(a); });
+}
 
 void Int::ModAdd(Int *a, Int *b) {
-  Int p;
-  Add(a,b);
-  p.Sub(this,&_P);
-  if(p.IsPositive())
-    Set(&p);
+  ModAddHelper([this, a, b]() { Add(a, b); });
 }
-
-// ------------------------------------------------
 
 void Int::ModDouble() {
-  Int p;
-  Add(this);
-  p.Sub(this,&_P);
-  if(p.IsPositive())
-    Set(&p);
+  ModAddHelper([this]() { Add(this); });
 }
-
-// ------------------------------------------------
 
 void Int::ModAdd(uint64_t a) {
-  Int p;
-  Add(a);
-  p.Sub(this,&_P);
-  if(p.IsPositive())
-    Set(&p);
+  ModAddHelper([this, a]() { Add(a); });
 }
-
-// ------------------------------------------------
 
 void Int::ModSub(Int *a) {
   Sub(a);
@@ -66,28 +51,23 @@ void Int::ModSub(Int *a) {
     Add(&_P);
 }
 
-// ------------------------------------------------
-
 void Int::ModSub(uint64_t a) {
   Sub(a);
   if (IsNegative())
     Add(&_P);
 }
 
-// ------------------------------------------------
-
-void Int::ModSub(Int *a,Int *b) {
-  Sub(a,b);
+void Int::ModSub(Int *a, Int *b) {
+  Sub(a, b);
   if (IsNegative())
     Add(&_P);
 }
-
-// ------------------------------------------------
 
 void Int::ModNeg() {
   Neg();
   Add(&_P);
 }
+
 
 // ------------------------------------------------
 
