@@ -175,7 +175,8 @@ public:
   };
 
 private:
-
+  template<typename Func>
+  void ModAddHelper(Func addFunc);
   void MatrixVecMul(Int *u,Int *v,int64_t _11,int64_t _12,int64_t _21,int64_t _22,uint64_t *cu,uint64_t* cv);
   void MatrixVecMul(Int* u,Int* v,int64_t _11,int64_t _12,int64_t _21,int64_t _22);
   uint64_t AddCh(Int *a,uint64_t ca,Int* b,uint64_t cb);
