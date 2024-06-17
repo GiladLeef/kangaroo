@@ -36,7 +36,7 @@ FFFFFFFFFFFFFF
 To run a server:
 
 ```
-Kangaroo.exe -d 10 -s -w save.work -wsplit -wi 10 in.txt
+kangaroo -d 10 -s -w save.work -wsplit -wi 10 in.txt
 ```
 
 ### Probability of Success
