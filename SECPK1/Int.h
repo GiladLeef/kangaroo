@@ -248,6 +248,7 @@ static inline unsigned char _addcarry_u64(uint64_t a, uint64_t b, unsigned char 
     );
     return a;
 }
+#endif
 
 #define _byteswap_uint64 __builtin_bswap64
 #define LZC(x) __builtin_clzll(x)
@@ -260,8 +261,6 @@ i.bits64[1] = i64 >> 63;  \
 i.bits64[2] = i.bits64[1];\
 i.bits64[3] = i.bits64[1];\
 i.bits64[4] = i.bits64[1];
-
-#endif
 
 static void inline imm_mul(uint64_t *x, uint64_t y, uint64_t *dst,uint64_t *carryH) {
 
