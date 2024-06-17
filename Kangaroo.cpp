@@ -295,6 +295,8 @@ inline bool IsDP(const uint64_t value) {
 
 void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     // Global init
+    vector<ITEM> dps;
+
     int thId = ph->threadId;
     double lastSent = 0;
 
@@ -360,7 +362,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
                 it.x.Set(&ph->px[g]);
                 it.d.Set(&ph->distance[g]);
                 it.kIdx = g;
-                // Push to server request
+                dps.push_back(it);
             }
         }
 
