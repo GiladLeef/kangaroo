@@ -3,7 +3,6 @@
 #include "SECPK1/IntGroup.h"
 #include "Timer.h"
 #include <string.h>
-#define _USE_MATH_DEFINES
 #include <math.h>
 #include <algorithm>
 #include <signal.h>
@@ -25,7 +24,7 @@ static SOCKET serverSock = 0;
 #define WAIT_FOR_READ  1
 #define WAIT_FOR_WRITE 2
 
-#define SERVER_VERSION 3
+#define SERVER_VERSION 1
 
 #define SERVER_HEADER 0x67DEDDC1
 
