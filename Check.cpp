@@ -9,7 +9,7 @@
 #include <thread>
 #include <atomic>
 #include <cmath>
-
+#include <cstring>
 using namespace std;
 
 uint32_t Kangaroo::CheckHash(uint32_t h, uint32_t nbItem, HashTable* hT, FILE* f) {
@@ -172,7 +172,7 @@ void Kangaroo::CheckPartition(int nbCore,std::string& partName) {
       params[i].isRunning = true;
       params[i].hStart = p + i;
       params[i].hStop = 0;
-      params[i].part1Name = _strdup(partName.c_str());
+      params[i].part1Name = strdup(partName.c_str());
       thHandles[i] = LaunchThread(_checkPartThread,params + i);
     }
 
