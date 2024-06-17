@@ -9,7 +9,7 @@ This program offers a powerful solution for tackling the Elliptic Curve Discrete
 - **Fast modular multiplication:** Utilizes 2 steps folding 512 bits to 256 bits reduction using 64-bit digits.
 - **Multi-GPU support:** Supports multi-GPU usage for parallel processing.
 - **CUDA optimization:** CUDA optimization through inline PTX assembly for enhanced performance.
-- 
+
 ### How It Works
 
 The algorithm employs two herds of kangaroos, a tame herd, and a wild herd. When a kangaroo from each herd collides, the key can be solved. The distinguished points method with a hashtable is used to detect collisions efficiently. The algorithm iteratively updates the positions of the kangaroos until a collision is detected, leading to the solution of the ECDLP.
