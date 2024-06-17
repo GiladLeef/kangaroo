@@ -41,25 +41,25 @@ NVCC       = $(CUDA)/bin/nvcc
 ifdef gpu
 
 ifdef debug
-CXXFLAGS   = -DWITHGPU -m64  -mssse3  -Wno-write-strings -g -I. -I$(CUDA)/include
+CXXFLAGS   = -static-libgcc -static-libstdc++ -DWITHGPU -m64  -mssse3  -Wno-write-strings -g -I. -I$(CUDA)/include
 else
-CXXFLAGS   = -DWITHGPU -m64 -mssse3  -Wno-write-strings -O3 -I. -I$(CUDA)/include
+CXXFLAGS   = -static-libgcc -static-libstdc++ -DWITHGPU -m64 -mssse3  -Wno-write-strings -O3 -I. -I$(CUDA)/include
 endif
 
 else
 
 ifdef debug
-CXXFLAGS   = -m64 -mssse3  -Wno-write-strings -g -I. -I$(CUDA)/include
+CXXFLAGS   = -static-libgcc -static-libstdc++ -m64 -mssse3  -Wno-write-strings -g -I. -I$(CUDA)/include
 else
-CXXFLAGS   =  -m64 -mssse3  -Wno-write-strings -O3 -I. -I$(CUDA)/include
+CXXFLAGS   =  -static-libgcc -static-libstdc++ -m64 -mssse3  -Wno-write-strings -O3 -I. -I$(CUDA)/include
 endif
 
 endif
 
 ifeq ($(OS),Windows_NT)
-    LFLAGS = -lpthread -lws2_32
+    LFLAGS = -static-libgcc -static-libstdc++ -lpthread -lws2_32
 else
-    LFLAGS = -lpthread
+    LFLAGS = -static-libgcc -static-libstdc++ -lpthread
 endif
 
 #--------------------------------------------------------------------
