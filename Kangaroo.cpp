@@ -292,11 +292,8 @@ bool Kangaroo::AddToTable(uint64_t h,int128_t *x,int128_t *d) {
 inline bool IsDP(const uint64_t value) {
     return (value & 0x01) == 0;
 }
-
 void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
-    // Global init
     vector<ITEM> dps;
-
     int thId = ph->threadId;
     double lastSent = 0;
 
@@ -371,6 +368,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             if (now - lastSent > SEND_PERIOD) {
                 LOCK(ghMutex);
                 // Send to server
+                SendToServer(dps, ph->threadId, 0xFFFF);
                 UNLOCK(ghMutex);
                 lastSent = now;
             }
@@ -401,7 +399,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
         }
     }
 
-    // No need to delete individual arrays, just delete the outer struct
+    // Clean up allocated memory
     safe_delete_array(ph->px);
     safe_delete_array(ph->py);
     safe_delete_array(ph->distance);
