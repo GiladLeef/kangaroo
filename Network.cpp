@@ -1209,13 +1209,6 @@ bool Kangaroo::GetConfigFromServer() {
   GET("KeyY",serverConn,key.y.bits64,32,ntimeout);
   GET("DP",serverConn,&initDPSize,sizeof(int32_t),ntimeout);
 
-  if(version<3) {
-    isConnected = false;
-    close_socket(serverConn);
-    ::printf("Cannot connect to server: %s\nServer version must be >= 3\n",serverIp.c_str());
-    return false;
-  }
-
   // Set kangaroo number
   cmd = SERVER_SETKNB;
   PUT("CMD",serverConn,&cmd,1,ntimeout);
