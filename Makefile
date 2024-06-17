@@ -45,7 +45,6 @@ CXXFLAGS   = -DWITHGPU -m64  -mssse3  -Wno-write-strings -g -I. -I$(CUDA)/includ
 else
 CXXFLAGS   = -DWITHGPU -m64 -mssse3  -Wno-write-strings -O3 -I. -I$(CUDA)/include
 endif
-LFLAGS     = -lpthread -L$(CUDA)/lib64 -lcudart -lws2_32   # <- Added -lws2_32 here
 
 else
 
@@ -54,8 +53,13 @@ CXXFLAGS   = -m64 -mssse3  -Wno-write-strings -g -I. -I$(CUDA)/include
 else
 CXXFLAGS   =  -m64 -mssse3  -Wno-write-strings -O3 -I. -I$(CUDA)/include
 endif
-LFLAGS     = -lpthread -lws2_32   # <- Added -lws2_32 here
 
+endif
+
+ifeq ($(OS),Windows_NT)
+    LFLAGS = -lpthread -lws2_32
+else
+    LFLAGS = -lpthread
 endif
 
 #--------------------------------------------------------------------
