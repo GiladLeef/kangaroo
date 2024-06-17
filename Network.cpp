@@ -637,7 +637,7 @@ void Kangaroo::AcceptConnections(SOCKET server_soc) {
       char info[256];
       ::sprintf(info,"%s:%d",inet_ntoa(client_add.sin_addr),ntohs(client_add.sin_port));
 #ifdef WIN64
-      p->clientInfo = ::_strdup(info);
+      p->clientInfo = ::strdup(info);
 #else
       p->clientInfo = ::strdup(info);
 #endif
