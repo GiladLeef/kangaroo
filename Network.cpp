@@ -633,11 +633,6 @@ void Kangaroo::RunServer() {
     exit(-1);
   }
 
-  if(sizeof(DPHEADER) != 20) {
-    ::printf("Error: Invalid DPHEADER size struct\n");
-    exit(-1);
-  }
-
   if(saveKangaroo) {
     ::printf("Waring: Server does not support -ws, ignoring\n");
     saveKangaroo = false;
