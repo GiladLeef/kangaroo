@@ -824,7 +824,7 @@ void Kangaroo::WaitForServer() {
     
     // Wait for connection
     while(!isConnected) {
-      serverStatus = "Fault";
+      serverStatus = "Disconnected";
       Timer::SleepMillis(1000);
       // Try to reconnect
       isConnected = ConnectToServer(&serverConn);
@@ -873,14 +873,14 @@ void Kangaroo::WaitForServer() {
         if( nbRead<=0 ) {
           if(nbRead<0)
             ::printf("\nRecvFromServer(Status): %s\n",lastError.c_str()); 
-          serverStatus = "Fault";
+          serverStatus = "Disconnected";
           close_socket(serverConn);
           isConnected = false;
         } else {
 
           switch(status) {
           case SERVER_OK:
-            serverStatus = "OK";
+            serverStatus = "Connected";
             ok = true;
             break;
 
@@ -1140,7 +1140,7 @@ bool Kangaroo::GetConfigFromServer() {
   }
 
   isConnected = true;
-  serverStatus = "OK";
+  serverStatus = "Connected";
 
   Point key;
   key.Clear();
