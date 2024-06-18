@@ -592,7 +592,7 @@ void Kangaroo::Run(int nbThread) {
 
     memset(params, 0, totalThread * sizeof(TH_PARAM));
     memset(counters, 0, sizeof(counters));
-    ::printf("Number of CPU thread: %d\n", nbCPUThread);
+    ::printf("Number of CPU threads: %d\n", nbCPUThread);
 
     totalRW += nbCPUThread * (uint64_t)CPU_GRP_SIZE;
 
