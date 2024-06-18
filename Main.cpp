@@ -1,7 +1,6 @@
 #include "Kangaroo.h"
 #include "Timer.h"
 #include "SECPK1/SECP256k1.h"
-#include "GPU/GPUEngine.h"
 #include <fstream>
 #include <string>
 #include <string.h>
@@ -13,14 +12,10 @@ using namespace std;
 #define CHECKARG(opt,n) if(a>=argc-1) {::printf(opt " missing argument #%d\n",n);exit(0);} else {a++;}
 
 void printUsage() {
-    printf("Kangaroo [-v] [-t nbThread] [-d dpBit] [gpu] [-check]\n");
-    printf("         [-gpuId [0, 1]] [-g [g1x, g1y]]\n");
+    printf("Kangaroo [-v] [-t nbThread] [-d dpBit] [-check]\n");
     printf("         inFile\n");
     printf("Options:\n");
     printf(" -v: Print version\n");
-    printf(" -gpu: Enable GPU calculation\n");
-    printf(" -gpuId gpuId1,gpuId2,...: List of GPU(s) to use, default is 0\n");
-    printf(" -g g1x,g1y,g2x,g2y,...: Specify GPU(s) kernel gridsize, default is 2*(MP),2*(Core/MP)\n");
     printf(" -d: Specify number of leading zeros for the DP method (default is auto)\n");
     printf(" -t nbThread: Specify number of threads\n");
     printf(" -w workfile: Specify file to save work into (current processed key only)\n");
@@ -42,7 +37,6 @@ void printUsage() {
     printf(" -nt timeout: Network timeout in milliseconds (default is 3000ms)\n");
     printf(" -o fileName: Output result to fileName\n");
     printf(" -l: List CUDA enabled devices\n");
-    printf(" -check: Check GPU kernel vs CPU\n");
     printf(" inFile: Input configuration file\n");
     exit(0);
 }
@@ -120,8 +114,6 @@ static int dp = -1;
 static int nbCPUThread;
 static string configFile = "";
 static bool checkFlag = false;
-static bool gpuEnable = false;
-static vector<int> gpuId = { 0 };
 static vector<int> gridSize;
 static string workFile = "";
 static string checkWorkFile = "";
@@ -171,12 +163,6 @@ int main(int argc, char* argv[]) {
     } else if (strcmp(argv[a], "-h") == 0) {
       printUsage();
     } else if(strcmp(argv[a],"-l") == 0) {
-
-#ifdef WITHGPU
-      GPUEngine::PrintCudaInfo();
-#else
-      printf("GPU code not compiled, use -DWITHGPU when compiling.\n");
-#endif
       exit(0);
 
     } else if(strcmp(argv[a],"-w") == 0) {
@@ -257,17 +243,6 @@ int main(int argc, char* argv[]) {
       CHECKARG("-sp",1);
       port = getInt("serverPort",argv[a]);
       a++;
-    } else if(strcmp(argv[a],"-gpu") == 0) {
-      gpuEnable = true;
-      a++;
-    } else if(strcmp(argv[a],"-gpuId") == 0) {
-      CHECKARG("-gpuId",1);
-      getInts("gpuId",gpuId,string(argv[a]),',');
-      a++;
-    } else if(strcmp(argv[a],"-g") == 0) {
-      CHECKARG("-g",1);
-      getInts("gridSize",gridSize,string(argv[a]),',');
-      a++;
     } else if(strcmp(argv[a],"-v") == 0) {
       ::exit(0);
     } else if(strcmp(argv[a],"-check") == 0) {
@@ -282,21 +257,10 @@ int main(int argc, char* argv[]) {
     }
 
   }
-
-  if(gridSize.size() == 0) {
-    for(int i = 0; i < gpuId.size(); i++) {
-      gridSize.push_back(0);
-      gridSize.push_back(0);
-    }
-  } else if(gridSize.size() != gpuId.size() * 2) {
-    printf("Invalid gridSize or gpuId argument, must have coherent size\n");
-    exit(-1);
-  }
-
-  Kangaroo *v = new Kangaroo(secp,dp,gpuEnable,workFile,iWorkFile,savePeriod,saveKangaroo,saveKangarooByServer,
+  Kangaroo *v = new Kangaroo(secp,dp,workFile,iWorkFile,savePeriod,saveKangaroo,saveKangarooByServer,
                              maxStep,wtimeout,port,ntimeout,serverIP,outputFile,splitWorkFile);
   if(checkFlag) {
-    v->Check(gpuId,gridSize);  
+    v->Check();  
     exit(0);
   } else {
     if(checkWorkFile.length() > 0) {
@@ -326,7 +290,7 @@ int main(int argc, char* argv[]) {
     if(serverMode)
       v->RunServer();
     else
-      v->Run(nbCPUThread,gpuId,gridSize);
+      v->Run(nbCPUThread);
   }
 
   return 0;

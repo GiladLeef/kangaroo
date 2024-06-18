@@ -510,8 +510,6 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
 
       } else {
 
-        //::printf("%d DP from %s\n",nbDP,p->clientInfo.c_str());
-
         DP *dp = (DP *)malloc(sizeof(DP)* head.nbDP);
         GETFREE("DP",p->clientSock,dp,sizeof(DP)* head.nbDP,ntimeout,dp);
         state = GetServerStatus();
@@ -525,47 +523,6 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
           CLIENT_ABORT();
 
         } else {
-
-//#define VALIDITY_POINT_CHECK
-#ifdef VALIDITY_POINT_CHECK
-          // Check validity
-          for(uint32_t i=0;i< head.nbDP;i++) {
-            
-            uint64_t h = (uint64_t)dp[i].h;
-            if(h >= HASH_SIZE) {
-              ::printf("\nInvalid data from: %s [dp=%d PID=%u thId=%u gpuId=%u]\n",p->clientInfo,i,
-                                                            head.processId,head.threadId,head.gpuId);
-              free(dp);
-              CLIENT_ABORT();
-            }
-
-            Int dist;
-            uint32_t kType;
-            HashTable::CalcDistAndType(dp[i].d,&dist,&kType);
-            Point P = secp->ComputePublicKey(&dist);
-
-            if(kType == WILD)
-              P = secp->AddDirect(keyToSearch,P);
-
-            uint32_t hC = P.x.bits64[2] & HASH_MASK;
-            bool ok = (hC == h) && (P.x.bits64[0] == dp[i].x.i64[0]) && (P.x.bits64[1] == dp[i].x.i64[1]);
-            if(!ok) {
-              if(kType==TAME) {
-                ::printf("\nWrong TAME point from: %s [dp=%d PID=%u thId=%u gpuId=%u]\n",p->clientInfo,i,
-                  head.processId,head.threadId,head.gpuId);
-              } else {
-                ::printf("\nWrong WILD point from: %s [dp=%d PID=%u thId=%u gpuId=%u]\n",p->clientInfo,i,
-                  head.processId,head.threadId,head.gpuId);
-              }
-              //::printf("X=%s\n",P.x.GetBase16().c_str());
-              //::printf("X=%08X%08X%08X%08X\n",dp[i].x.i32[3],dp[i].x.i32[2],dp[i].x.i32[1],dp[i].x.i32[0]);
-              //::printf("D=%08X%08X%08X%08X\n",dp[i].d.i32[3],dp[i].d.i32[2],dp[i].d.i32[1],dp[i].d.i32[0]);
-              free(dp);
-              CLIENT_ABORT();
-            }
-
-          }
-#endif
 
           LOCK(ghMutex);
           DP_CACHE dc;
@@ -1110,7 +1067,7 @@ bool Kangaroo::SendKangaroosToServer(std::string& fileName,std::vector<int128_t>
 }
 
 // Send DP to Server
-bool Kangaroo::SendToServer(std::vector<ITEM> &dps,uint32_t threadId,uint32_t gpuId) {
+bool Kangaroo::SendToServer(std::vector<ITEM> &dps,uint32_t threadId) {
 
   int nbRead;
   int nbWrite;
@@ -1149,7 +1106,6 @@ bool Kangaroo::SendToServer(std::vector<ITEM> &dps,uint32_t threadId,uint32_t gp
     head.nbDP = nbDP;
     head.processId = pid;
     head.threadId = threadId;
-    head.gpuId = gpuId;
 
     PUTFREE("CMD",serverConn,&cmd,1,ntimeout,dp);
     PUTFREE("DPHeader",serverConn,&head,sizeof(DPHEADER),ntimeout,dp);

@@ -16,12 +16,11 @@ using namespace std;
 
 // ----------------------------------------------------------------------------
 
-Kangaroo::Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,string &workFile,string &iWorkFile,uint32_t savePeriod,bool saveKangaroo,bool saveKangarooByServer,
+Kangaroo::Kangaroo(Secp256K1 *secp,int32_t initDPSize,string &workFile,string &iWorkFile,uint32_t savePeriod,bool saveKangaroo,bool saveKangarooByServer,
                    double maxStep,int wtimeout,int port,int ntimeout,string serverIp,string outputFile,bool splitWorkfile) {
 
   this->secp = secp;
   this->initDPSize = initDPSize;
-  this->useGpu = useGpu;
   this->offsetCount = 0;
   this->offsetTime = 0.0;
   this->workFile = workFile;
@@ -318,7 +317,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     }
 
     if (keyIdx == 0)
-        ::printf("SolveKeyCPU Thread %d: %d kangaroos\n", ph->threadId, CPU_GRP_SIZE);
+        ::printf("Thread %d: %d kangaroos\n", ph->threadId, CPU_GRP_SIZE);
 
     ph->hasStarted = true;
 
@@ -368,7 +367,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             if (now - lastSent > SEND_PERIOD) {
                 LOCK(ghMutex);
                 // Send to server
-                SendToServer(dps, ph->threadId, 0xFFFF);
+                SendToServer(dps, ph->threadId);
                 UNLOCK(ghMutex);
                 lastSent = now;
             }
@@ -407,149 +406,11 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     ph->isRunning = false;
 }
 
-void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
-
-  double lastSent = 0;
-
-  // Global init
-  int thId = ph->threadId;
-
-#ifdef WITHGPU
-
-  vector<ITEM> dps;
-  vector<ITEM> gpuFound;
-  GPUEngine *gpu;
-
-  gpu = new GPUEngine(ph->gridSizeX,ph->gridSizeY,ph->gpuId,65536 * 2);
-
-  if(keyIdx == 0)
-    ::printf("GPU: %s (%.1f MB used)\n",gpu->deviceName.c_str(),gpu->GetMemory() / 1048576.0);
-
-  double t0 = Timer::get_tick();
-
-
-  if( ph->px==NULL ) {
-    if(keyIdx == 0)
-      ::printf("SolveKeyGPU Thread GPU#%d: creating kangaroos...\n",ph->gpuId);
-    // Create Kangaroos, if not already loaded
-    uint64_t nbThread = gpu->GetNbThread();
-    ph->px = new Int[ph->nbKangaroo];
-    ph->py = new Int[ph->nbKangaroo];
-    ph->distance = new Int[ph->nbKangaroo];
-
-    for(uint64_t i = 0; i<nbThread; i++) {
-      CreateHerd(GPU_GRP_SIZE,&(ph->px[i*GPU_GRP_SIZE]),
-                              &(ph->py[i*GPU_GRP_SIZE]),
-                              &(ph->distance[i*GPU_GRP_SIZE]),
-                              TAME);
-    }
-  }
-
-  gpu->SetWildOffset(&rangeWidthDiv2);
-  gpu->SetParams(dMask,jumpDistance,jumpPointx,jumpPointy);
-  gpu->SetKangaroos(ph->px,ph->py,ph->distance);
-
-  if(workFile.length()==0 || !saveKangaroo) {
-    // No need to get back kangaroo, free memory
-    safe_delete_array(ph->px);
-    safe_delete_array(ph->py);
-    safe_delete_array(ph->distance);
-  }
-
-  gpu->callKernel();
-
-  double t1 = Timer::get_tick();
-
-  if(keyIdx == 0)
-    ::printf("SolveKeyGPU Thread GPU#%d: 2^%.2f kangaroos [%.1fs]\n",ph->gpuId,log2((double)ph->nbKangaroo),(t1-t0));
-
-  ph->hasStarted = true;
-
-  while(!endOfSearch) {
-
-    gpu->Launch(gpuFound);
-    counters[thId] += ph->nbKangaroo * NB_RUN;
-
-    if( clientMode ) {
-
-      for(int i=0;i<(int)gpuFound.size();i++)
-        dps.push_back(gpuFound[i]);
-
-      double now = Timer::get_tick();
-      if(now - lastSent > SEND_PERIOD) {
-        LOCK(ghMutex);
-        SendToServer(dps,ph->threadId,ph->gpuId);
-        UNLOCK(ghMutex);
-        lastSent = now;
-      }
-
-    } else {
-
-      if(gpuFound.size() > 0) {
-
-        LOCK(ghMutex);
-
-        for(int g = 0; !endOfSearch && g < gpuFound.size(); g++) {
-
-          uint32_t kType = (uint32_t)(gpuFound[g].kIdx % 2);
-
-          if(!AddToTable(&gpuFound[g].x,&gpuFound[g].d,kType)) {
-            // Collision inside the same herd
-            // We need to reset the kangaroo
-            Int px;
-            Int py;
-            Int d;
-            CreateHerd(1,&px,&py,&d,kType,false);
-            gpu->SetKangaroo(gpuFound[g].kIdx,&px,&py,&d);
-            collisionInSameHerd++;
-          }
-
-        }
-        UNLOCK(ghMutex);
-      }
-
-    }
-
-    // Save request
-    if(saveRequest && !endOfSearch) {
-      // Get kangaroos
-      if(saveKangaroo)
-        gpu->GetKangaroos(ph->px,ph->py,ph->distance);
-      ph->isWaiting = true;
-      LOCK(saveMutex);
-      ph->isWaiting = false;
-      UNLOCK(saveMutex);
-    }
-
-  }
-
-
-  safe_delete_array(ph->px);
-  safe_delete_array(ph->py);
-  safe_delete_array(ph->distance);
-  delete gpu;
-
-#else
-
-  ph->hasStarted = true;
-
-#endif
-
-  ph->isRunning = false;
-
-}
-
 // ----------------------------------------------------------------------------
 
 void *_SolveKeyCPU(void *lpParam) {
   TH_PARAM *p = (TH_PARAM *)lpParam;
   p->obj->SolveKeyCPU(p);
-  return 0;
-}
-
-void *_SolveKeyGPU(void *lpParam) {
-  TH_PARAM *p = (TH_PARAM *)lpParam;
-  p->obj->SolveKeyGPU(p);
   return 0;
 }
 
@@ -714,23 +575,15 @@ void Kangaroo::InitSearchKey() {
 
 }
 
-void Kangaroo::Run(int nbThread, std::vector<int> gpuId, std::vector<int> gridSize) {
+void Kangaroo::Run(int nbThread) {
     double t0 = Timer::get_tick();
 
     nbCPUThread = nbThread;
-    nbGPUThread = (useGpu ? (int)gpuId.size() : 0);
     totalRW = 0;
 
-#ifndef WITHGPU
-    if (nbGPUThread > 0) {
-        ::printf("GPU code not compiled, use -DWITHGPU when compiling.\n");
-        nbGPUThread = 0;
-    }
-#endif
-
-    uint64_t totalThread = (uint64_t)nbCPUThread + (uint64_t)nbGPUThread;
+    uint64_t totalThread = (uint64_t)nbCPUThread;
     if (totalThread == 0) {
-        ::printf("No CPU or GPU thread, exiting.\n");
+        ::printf("No CPU threadS, exiting.\n");
         ::exit(0);
     }
 
@@ -740,24 +593,6 @@ void Kangaroo::Run(int nbThread, std::vector<int> gpuId, std::vector<int> gridSi
     memset(params, 0, totalThread * sizeof(TH_PARAM));
     memset(counters, 0, sizeof(counters));
     ::printf("Number of CPU thread: %d\n", nbCPUThread);
-
-#ifdef WITHGPU
-    // Compute grid size
-    for (int i = 0; i < nbGPUThread; i++) {
-        int x = gridSize[2ULL * i];
-        int y = gridSize[2ULL * i + 1ULL];
-        if (!GPUEngine::GetGridSize(gpuId[i], &x, &y)) {
-            free(thHandles);
-            return;
-        }
-        else {
-            params[nbCPUThread + i].gridSizeX = x;
-            params[nbCPUThread + i].gridSizeY = y;
-        }
-        params[nbCPUThread + i].nbKangaroo = (uint64_t)GPU_GRP_SIZE * x * y;
-        totalRW += params[nbCPUThread + i].nbKangaroo;
-    }
-#endif
 
     totalRW += nbCPUThread * (uint64_t)CPU_GRP_SIZE;
 
@@ -830,25 +665,14 @@ void Kangaroo::Run(int nbThread, std::vector<int> gpuId, std::vector<int> gridSi
                 thHandles[i] = LaunchThread(_SolveKeyCPU, params + i);
             }
 
-#ifdef WITHGPU
-            // Launch GPU threads
-            for (int i = 0; i < nbGPUThread; i++) {
-                int id = nbCPUThread + i;
-                params[id].threadId = 0x80L + i;
-                params[id].isRunning = true;
-                params[id].gpuId = gpuId[i];
-                thHandles[id] = LaunchThread(_SolveKeyGPU, params + id);
-            }
-#endif
-
             // Wait for end
             Process(params, "MK/s");
-            JoinThreads(thHandles, nbCPUThread + nbGPUThread);
-            FreeHandles(thHandles, nbCPUThread + nbGPUThread);
+            JoinThreads(thHandles, nbCPUThread);
+            FreeHandles(thHandles, nbCPUThread);
             hashTable.Reset();
 
 #ifdef STATS
-            uint64_t count = getCPUCount() + getGPUCount();
+            uint64_t count = getCPUCount();
             totalCount += count;
             totalDead += collisionInSameHerd;
             double SN = pow(2.0, rangePower / 2.0);
