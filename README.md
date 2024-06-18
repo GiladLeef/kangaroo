@@ -34,7 +34,7 @@ FFFFFFFFFFFFFF
 To run a server:
 
 ```
-kangaroo -d 47 -s -w save.work -wsplit -wi 47 puzzles/130.txt
+kangaroo -d 47 -s -w save.work -wsplit -wi 3600 puzzles/130.txt
 ```
 
 ### Probability of Success
