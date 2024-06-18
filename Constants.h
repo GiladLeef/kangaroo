@@ -1,6 +1,5 @@
 #ifndef CONSTANTSH
 #define CONSTANTSH
-#include <cstdint>
 
 // Release number
 #define RELEASE "1.0"
