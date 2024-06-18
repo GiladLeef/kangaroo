@@ -1,4 +1,3 @@
-
 // WSA Error string
 typedef struct {
   int   errCode;
