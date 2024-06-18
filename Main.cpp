@@ -36,7 +36,6 @@ void printUsage() {
     printf(" -sp port: Server port, default is 17403\n");
     printf(" -nt timeout: Network timeout in milliseconds (default is 3000ms)\n");
     printf(" -o fileName: Output result to fileName\n");
-    printf(" -l: List CUDA enabled devices\n");
     printf(" inFile: Input configuration file\n");
     exit(0);
 }
