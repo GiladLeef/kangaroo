@@ -642,14 +642,6 @@ void Kangaroo::Run(int nbThread) {
     // Fetch kangaroos (if any)
     FectchKangaroos(params);
 
-#ifdef STATS
-    CPU_GRP_SIZE = 1024;
-    for (; CPU_GRP_SIZE <= 1024; CPU_GRP_SIZE *= 4) {
-        uint64_t totalCount = 0;
-        uint64_t totalDead = 0;
-
-#endif
-
         for (keyIdx = 0; keyIdx < keysToSearch.size(); keyIdx++) {
             InitSearchKey();
             endOfSearch = false;
@@ -670,23 +662,6 @@ void Kangaroo::Run(int nbThread) {
             JoinThreads(thHandles, nbCPUThread);
             FreeHandles(thHandles, nbCPUThread);
             hashTable.Reset();
-
-#ifdef STATS
-            uint64_t count = getCPUCount();
-            totalCount += count;
-            totalDead += collisionInSameHerd;
-            double SN = pow(2.0, rangePower / 2.0);
-            double avg = (double)totalCount / (double)(keyIdx + 1);
-            ::printf("\n[%3d] 2^%.3f Dead:%d Avg:2^%.3f DeadAvg:%.1f (%.3f %.3f sqrt(N))\n",
-                keyIdx, log2((double)count), (int)collisionInSameHerd,
-                log2(avg), (double)totalDead / (double)(keyIdx + 1),
-                avg / SN, expectedNbOp / SN);
-        }
-        std::string fName = "DP" + std::to_string(dpSize) + ".txt";
-        FILE *f = fopen(fName.c_str(), "a");
-        fprintf(f, "%d %f\n", CPU_GRP_SIZE * nbCPUThread, (double)totalCount);
-        fclose(f);
-#endif
     }
 
     double t1 = Timer::get_tick();
