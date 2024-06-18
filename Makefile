@@ -14,9 +14,8 @@ OBJET = $(addprefix $(OBJDIR)/, \
       Network.o Merge.o PartMerge.o)
 
 CXX        = g++
-NVCC       = $(CUDA)/bin/nvcc
 
-CXXFLAGS   =  -static-libgcc -static-libstdc++ -m64 -mssse3  -Wno-write-strings -O3 -I. -I$(CUDA)/include
+CXXFLAGS   =  -static-libgcc -static-libstdc++ -m64 -mssse3  -Wno-write-strings -O3 -I.
 
 ifeq ($(OS),Windows_NT)
     LFLAGS = -static-libgcc -static-libstdc++ -lpthread -lws2_32
