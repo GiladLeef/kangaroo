@@ -15,12 +15,12 @@ OBJET = $(addprefix $(OBJDIR)/, \
 
 CXX        = g++
 
-CXXFLAGS   =  -static-libgcc -static-libstdc++ -m64 -mssse3  -Wno-write-strings -O3 -I.
+CXXFLAGS   =  -static -static-libgcc -static-libstdc++ -m64 -mssse3  -Wno-write-strings -O3 -I.
 
 ifeq ($(OS),Windows_NT)
-    LFLAGS = -static-libgcc -static-libstdc++ -lpthread -lws2_32
+    LFLAGS = -static -static-libgcc -static-libstdc++ -lpthread -lws2_32
 else
-    LFLAGS = -static-libgcc -static-libstdc++ -lpthread
+    LFLAGS = -static -static-libgcc -static-libstdc++ -lpthread
 endif
 
 
