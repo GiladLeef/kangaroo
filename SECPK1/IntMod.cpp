@@ -319,121 +319,10 @@ void Int::ModInv() {
   // Compute modular inverse of this mop _P
   // 0 <= this < _P  , _P must be odd
   // Return 0 if no inverse
-
-  // 256bit 
-  //#define XCD 1               // ~97  kOps/s
-  //#define MONTGOMERY 1        // ~360 kOps/s
-  #define DRS62 1                // ~780 kOps/s
-
   Int u(&_P);
   Int v(this);
   Int r((int64_t)0);
   Int s((int64_t)1);
-
-#ifdef XCD
-
-  Int q, t1, t2, w;
-
-  // Classic XCD 
-
-  bool bIterations = true;  // Remember odd/even iterations
-  while (!u.IsZero()) {
-    // Step X3. Divide and "Subtract"
-    q.Set(&v);
-    q.Div(&u, &t2);   // q = u / v, t2 = u % v
-    w.Mult(&q, &r);   // w = q * r
-    t1.Add(&s, &w);   // t1 = s + w
-
-                      // Swap u,v & r,s
-    s.Set(&r);
-    r.Set(&t1);
-    v.Set(&u);
-    u.Set(&t2);
-
-    bIterations = !bIterations;
-  }
-
-  if (!v.IsOne()) {
-    CLEAR();
-    return;
-  }
-
-  if (!bIterations) {
-    Set(&_P);
-    Sub(&s);  /* inv = n - u1 */
-  } else {
-    Set(&s);  /* inv = u1     */
-  }
-
-#endif
-
-#ifdef MONTGOMERY
-
-  Int x;
-  int k = 0;
-  if(v.IsZero()) {
-    Set(&v);
-    return;
-  }
-
-  // Montgomery method
-  while (v.IsStrictPositive()) {
-    if (u.IsEven()) {
-      shiftR(1, u.bits64);
-      shiftL(1, s.bits64);
-    } else if (v.IsEven()) {
-      shiftR(1, v.bits64);
-      shiftL(1, r.bits64);
-    } else {
-      x.Set(&u);
-      x.Sub(&v);
-      if (x.IsStrictPositive()) {
-        shiftR(1, x.bits64);
-        u.Set(&x);
-        r.Add(&s);
-        shiftL(1, s.bits64);
-      } else {
-        x.Neg();
-        shiftR(1, x.bits64);
-        v.Set(&x);
-        s.Add(&r);
-        shiftL(1, r.bits64);
-      }
-    }
-    k++;
-  }
-
-  if (r.IsGreater(&_P))
-    r.Sub(&_P);
-  r.Neg();
-  r.Add(&_P);
-
-  // Demontgomerise (divide by 2^k)
-  uint64_t ML;
-  uint64_t carryR;
-  while (k>=64) {
-    ML = r.bits64[0] * MM64;
-    imm_umul(_P.bits64,ML,s.bits64);
-    carryR = r.AddCh(&s,0);
-    r.ShiftR64Bit();
-    r.bits64[NB64BLOCK-1] = carryR;
-    k-=64;
-  }
-  if(k>0) {
-    uint64_t mask = (1ULL << k) - 1;
-    ML = (r.bits64[0] * MM64) & mask;
-    imm_umul(_P.bits64,ML,s.bits64);
-    carryR = r.AddCh(&s,0);
-    shiftR(k,r.bits64,carryR);
-  }
-  if(r.IsGreater(&_P))
-    r.Sub(&_P);
-
-  Set(&r);
-
-#endif
-
-#ifdef DRS62
 
   // Delayed right shift 62bits
   Int r0_P;
@@ -455,7 +344,6 @@ void Int::ModInv() {
 
     MatrixVecMul(&u,&v,uu,uv,vu,vv);
 
-#if 1
     // Make u,v positive
     // Required only for Pornin's method
     if(u.IsNegative()) {
@@ -468,7 +356,6 @@ void Int::ModInv() {
       vu = -vu;
       vv = -vv;
     }
-#endif
 
     MatrixVecMul(&r,&s,uu,uv,vu,vv,&carryR,&carryS);
 
@@ -512,8 +399,6 @@ void Int::ModInv() {
     r.Sub(&_P);
 
   Set(&r);
-
-#endif
 
 }
 
