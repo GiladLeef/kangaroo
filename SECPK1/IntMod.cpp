@@ -774,12 +774,6 @@ void Int::ModMulK1(Int *a, Int *b) {
 
   // Probability of carry here or that this>P is very very unlikely
   bits64[4] = 0; 
-#if BISIZE==512
-  bits64[5] = 0;
-  bits64[6] = 0;
-  bits64[7] = 0;
-  bits64[8] = 0;
-#endif
 
 }
 
@@ -852,12 +846,6 @@ void Int::ModMulK1(Int *a) {
   c = _addcarry_u64(c, r512[3], 0, bits64 + 3);
   // Probability of carry here or that this>P is very very unlikely
   bits64[4] = 0;
-#if BISIZE==512
-  bits64[5] = 0;
-  bits64[6] = 0;
-  bits64[7] = 0;
-  bits64[8] = 0;
-#endif
 
 }
 
@@ -1058,13 +1046,6 @@ void Int::ModSquareK1(Int *a) {
   c = _addcarry_u64(c, r512[3], 0, bits64 + 3);
   // Probability of carry here or that this>P is very very unlikely
   bits64[4] = 0;
-#if BISIZE==512
-  bits64[5] = 0;
-  bits64[6] = 0;
-  bits64[7] = 0;
-  bits64[8] = 0;
-#endif
-
 }
 
 static Int _R2o;                               // R^2 for SecpK1 order modular mult
