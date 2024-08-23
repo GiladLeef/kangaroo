@@ -334,8 +334,6 @@ void Int::ModInv() {
   int pos = NB64BLOCK - 1;
   while(pos >= 1 && (u.bits64[pos] | v.bits64[pos]) == 0) pos--;
 
-  //printf("ModInv(%s)\n",GetBase16().c_str());
-
   while (!v.IsZero()) {
 
     DivStep62(&u,&v,&eta,&pos,&uu,&uv,&vu,&vv);
@@ -372,11 +370,7 @@ void Int::ModInv() {
     shiftR(62, v.bits64);
     shiftR(62, r.bits64, carryR);
     shiftR(62, s.bits64, carryS);
-
-    //printf("U=%s\n",u.GetBase16().c_str());
-    //printf("V=%s\n",v.GetBase16().c_str());
-    //printf("R=%s\n",r.GetBase16().c_str());
-    //printf("S=%s\n",s.GetBase16().c_str());
+    
     totalCount++;
 
   }
@@ -627,44 +621,30 @@ void Int::SetupField(Int *n, Int *R, Int *R2, Int *R3, Int *R4) {
 
 }
 
-// ------------------------------------------------
 void Int::MontgomeryMult(Int *a) {
+    Int t;
+    Int pr;
+    Int p;
+    uint64_t ML;
+    uint64_t c;
 
-  // Compute a*b*R^-1 (mod n),  R=2^k (mod n), k = Msize*64
-  // a and b must be lower than n
-  // See SetupField()
+    // Use a more efficient multiplication and addition
+    for (int i = 0; i < Msize; i++) {
+        imm_umul(a->bits64, bits64[i], pr.bits64);
+        ML = (pr.bits64[0] + t.bits64[0]) * MM64;
+        imm_umul(_P.bits64, ML, p.bits64);
+        c = pr.AddC(&p);
+        t.AddAndShift(&t, &pr, c);
+    }
 
-  Int t;
-  Int pr;
-  Int p;
-  uint64_t ML;
-  uint64_t c;
-
-  // i = 0
-  imm_umul(a->bits64, bits64[0], pr.bits64);
-  ML = pr.bits64[0] * MM64;
-  imm_umul(_P.bits64, ML, p.bits64);
-  c = pr.AddC(&p);
-  memcpy(t.bits64, pr.bits64 + 1, 8 * (NB64BLOCK - 1));
-  t.bits64[NB64BLOCK - 1] = c;
-
-  for (int i = 1; i < Msize; i++) {
-
-    imm_umul(a->bits64, bits64[i], pr.bits64);
-    ML = (pr.bits64[0] + t.bits64[0]) * MM64;
-    imm_umul(_P.bits64, ML, p.bits64);
-	  c = pr.AddC(&p);
-    t.AddAndShift(&t, &pr, c);
-
-  }
-
-  p.Sub(&t,&_P);
-  if (p.IsPositive())
-    Set(&p);
-  else
-    Set(&t);
-
+    p.Sub(&t, &_P);
+    if (p.IsPositive()) {
+        Set(&p);
+    } else {
+        Set(&t);
+    }
 }
+
 
 void Int::MontgomeryMult(Int *a, Int *b) {
 
