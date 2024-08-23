@@ -1,5 +1,4 @@
 #include <signal.h>
-
 #include "Kangaroo.h"
 #include <fstream>
 #include "SECPK1/IntGroup.h"
@@ -10,6 +9,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <iostream>
+
 using namespace std;
 
 #define safe_delete_array(x) if(x) {delete[] x;x=NULL;}
