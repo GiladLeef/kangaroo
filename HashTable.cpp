@@ -67,87 +67,77 @@ void HashTable::Convert(Int *x, Int *d, uint32_t type, uint64_t *h, int128_t *X,
 #define AV1() if(pnb1) { ::fread(&e1,32,1,f1); pnb1--; }
 #define AV2() if(pnb2) { ::fread(&e2,32,1,f2); pnb2--; }
 
-int HashTable::MergeH(uint32_t h, FILE* f1, FILE* f2, FILE* fd, uint32_t* nbDP, uint32_t *duplicate, Int* d1, uint32_t* k1, Int* d2, uint32_t* k2) {
-    uint32_t nb1;
-    uint32_t m1;
-    uint32_t nb2;
-    uint32_t m2;
+int HashTable::MergeH(uint32_t h, FILE* f1, FILE* f2, FILE* fd, uint32_t* nbDP, uint32_t* duplicate, Int* d1, uint32_t* k1, Int* d2, uint32_t* k2) {
+    uint32_t nb1, m1, nb2, m2;
     *duplicate = 0;
     *nbDP = 0;
-    ::fread(&nb1,sizeof(uint32_t),1,f1);
-    ::fread(&m1,sizeof(uint32_t),1,f1);
-    ::fread(&nb2,sizeof(uint32_t),1,f2);
-    ::fread(&m2,sizeof(uint32_t),1,f2);
+    fread(&nb1, sizeof(uint32_t), 1, f1);
+    fread(&m1, sizeof(uint32_t), 1, f1);
+    fread(&nb2, sizeof(uint32_t), 1, f2);
+    fread(&m2, sizeof(uint32_t), 1, f2);
+
     uint32_t nbd = 0;
     uint32_t md = nb1 + nb2;
-    if(md == 0) {
-        ::fwrite(&md,sizeof(uint32_t),1,fd);
-        ::fwrite(&md,sizeof(uint32_t),1,fd);
+    if (md == 0) {
+        fwrite(&md, sizeof(uint32_t), 1, fd);
+        fwrite(&md, sizeof(uint32_t), 1, fd);
         return ADD_OK;
     }
-    ENTRY *output = (ENTRY *)malloc( md * sizeof(ENTRY) );
-    ENTRY e1;
-    ENTRY e2;
-    uint32_t pnb1 = nb1;
-    uint32_t pnb2 = nb2;
+
+    std::vector<ENTRY> output(md);
+    ENTRY e1, e2;
+    uint32_t pnb1 = nb1, pnb2 = nb2;
     AV1();
     AV2();
-    bool end1 = (nb1 == 0);
-    bool end2 = (nb2 == 0);
+
+    bool end1 = (nb1 == 0), end2 = (nb2 == 0);
     bool collisionFound = false;
-    while(!(end1 && end2)) {
-        if( !end1 && !end2 ) {
-            int comp = compare(&e1.x,&e2.x);
-            if(comp < 0) {
-                memcpy(output+nbd,&e1,32);
-                nbd++;
+
+    while (!(end1 && end2)) {
+        if (!end1 && !end2) {
+            int comp = compare(&e1.x, &e2.x);
+            if (comp < 0) {
+                output[nbd++] = e1;
                 AV1();
-                nb1--;
-            } else if (comp==0) {
-                if((e1.d.i64[0] == e2.d.i64[0]) && (e1.d.i64[1] == e2.d.i64[1])) {
-                    *duplicate = *duplicate + 1;
+                --nb1;
+            } else if (comp == 0) {
+                if ((e1.d.i64[0] == e2.d.i64[0]) && (e1.d.i64[1] == e2.d.i64[1])) {
+                    ++(*duplicate);
                 } else {
-                    CalcDistAndType(e1.d,d1,k1);
-                    CalcDistAndType(e2.d,d2,k2);
+                    CalcDistAndType(e1.d, d1, k1);
+                    CalcDistAndType(e2.d, d2, k2);
                     collisionFound = true;
                 }
-                memcpy(output + nbd,&e1,32);
-                nbd++;
+                output[nbd++] = e1;
                 AV1();
                 AV2();
-                nb1--;
-                nb2--;
+                --nb1;
+                --nb2;
             } else {
-                memcpy(output + nbd,&e2,32);
-                nbd++;
+                output[nbd++] = e2;
                 AV2();
-                nb2--;
+                --nb2;
             }
-        } else if( !end1 && end2 ) {
-            memcpy(output + nbd,&e1,32);
-            nbd++;
+        } else if (!end1) {
+            output[nbd++] = e1;
             AV1();
-            nb1--;
-        } else if( end1 && !end2) {
-            memcpy(output + nbd,&e2,32);
-            nbd++;
+            --nb1;
+        } else if (!end2) {
+            output[nbd++] = e2;
             AV2();
-            nb2--;
+            --nb2;
         }
         end1 = (nb1 == 0);
         end2 = (nb2 == 0);
     }
-    if(nbd % 4 == 0) {
-        md = nbd;
-    } else {
-        md = ((nbd / 4) + 1) * 4;
-    }
-    ::fwrite(&nbd,sizeof(uint32_t),1,fd);
-    ::fwrite(&md,sizeof(uint32_t),1,fd);
-    ::fwrite(output,32,nbd,fd);
-    free(output);
+
+    md = (nbd + 3) / 4 * 4;
+    fwrite(&nbd, sizeof(uint32_t), 1, fd);
+    fwrite(&md, sizeof(uint32_t), 1, fd);
+    fwrite(output.data(), sizeof(ENTRY), nbd, fd);
     *nbDP = nbd;
-    return (collisionFound?ADD_COLLISION:ADD_OK);
+
+    return collisionFound ? ADD_COLLISION : ADD_OK;
 }
 
 int HashTable::Add(Int *x, Int *d, uint32_t type) {
