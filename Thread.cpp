@@ -118,70 +118,51 @@ string Kangaroo::GetTimeStr(double dTime) {
 
 // Wait for end of server and dispay stats
 void Kangaroo::ProcessServer() {
+    pthread_mutex_init(&ghMutex, NULL);
+    setvbuf(stdout, NULL, _IONBF, 0);
 
-  double t0;
-  double t1;
-  t0 = Timer::get_tick();
-  startTime = t0;
-  double lastSave = 0;
+    double t0 = Timer::get_tick();
+    double lastSave = 0;
 
-  // Acquire mutex ownership
-  pthread_mutex_init(&ghMutex, NULL);
-  setvbuf(stdout, NULL, _IONBF, 0);
+    while (!endOfSearch) {
+        double t1 = Timer::get_tick();
+        LOCK(ghMutex);
+        localCache.assign(recvDP.begin(), recvDP.end());
+        recvDP.clear();
+        UNLOCK(ghMutex);
 
-  while(!endOfSearch) {
-
-    t0 = Timer::get_tick();
-
-    LOCK(ghMutex);
-    // Get back all dps
-    localCache.clear();
-    for(int i=0;i<(int)recvDP.size();i++)
-      localCache.push_back(recvDP[i]);
-    recvDP.clear();
-    UNLOCK(ghMutex);
-
-    // Add to hashTable
-    for(int i = 0; i<(int)localCache.size() && !endOfSearch; i++) {
-      DP_CACHE dp = localCache[i];
-      for(int j = 0; j<(int)dp.nbDP && !endOfSearch; j++) {
-        uint64_t h = dp.dp[j].h;
-        if(!AddToTable(h,&dp.dp[j].x,&dp.dp[j].d)) {
-          // Collision inside the same herd
-          collisionInSameHerd++;
+        for (const auto& dp : localCache) {
+            for (int j = 0; j < dp.nbDP && !endOfSearch; j++) {
+                uint64_t h = dp.dp[j].h;
+                if (!AddToTable(h, &dp.dp[j].x, &dp.dp[j].d)) {
+                    collisionInSameHerd++;
+                }
+            }
+            free(dp.dp);
         }
-      }
-      free(dp.dp);
+
+        double elapsedTime = Timer::get_tick() - t1;
+        double toSleep = std::max(0.0, SEND_PERIOD - elapsedTime);
+        Timer::SleepMillis(static_cast<uint32_t>(toSleep * 1000.0));
+
+        if (!endOfSearch) {
+            printf("\r[Client %d][Kang 2^%.2f][DP Count 2^%.2f/2^%.2f][Dead %.0f][%s][%s]  ",
+                   connectedClient,
+                   log2((double)totalRW),
+                   log2((double)hashTable.GetNbItem()),
+                   log2(expectedNbOp / pow(2.0, dpSize)),
+                   (double)collisionInSameHerd,
+                   GetTimeStr(Timer::get_tick() - startTime).c_str(),
+                   hashTable.GetSizeInfo().c_str());
+        }
+
+        if (!workFile.empty() && !endOfSearch) {
+            if ((Timer::get_tick() - lastSave) > saveWorkPeriod) {
+                SaveServerWork();
+                lastSave = Timer::get_tick();
+            }
+        }
     }
-
-    t1 = Timer::get_tick();
-
-    double toSleep = SEND_PERIOD - (t1-t0);
-    if(toSleep<0) toSleep = 0.0;
-    Timer::SleepMillis((uint32_t)(toSleep*1000.0));
-
-    t1 = Timer::get_tick();
-
-    if(!endOfSearch)
-      printf("\r[Client %d][Kang 2^%.2f][DP Count 2^%.2f/2^%.2f][Dead %.0f][%s][%s]  ",
-        connectedClient,
-        log2((double)totalRW),
-        log2((double)hashTable.GetNbItem()),
-        log2(expectedNbOp / pow(2.0,dpSize)),
-        (double)collisionInSameHerd,
-        GetTimeStr(t1 - startTime).c_str(),
-        hashTable.GetSizeInfo().c_str()
-        );
-
-    if(workFile.length() > 0 && !endOfSearch) {
-      if((t1 - lastSave) > saveWorkPeriod) {
-        SaveServerWork();
-        lastSave = t1;
-      }
-    }
-
-  }
-
 }
 
 // Wait for end of threads and display stats
