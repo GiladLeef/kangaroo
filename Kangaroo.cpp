@@ -583,7 +583,7 @@ void Kangaroo::Run(int nbThread) {
 
     uint64_t totalThread = (uint64_t)nbCPUThread;
     if (totalThread == 0) {
-        ::printf("No CPU threadS, exiting.\n");
+        ::printf("No CPU threads, exiting.\n");
         ::exit(0);
     }
 
