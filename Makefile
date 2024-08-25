@@ -9,13 +9,8 @@ ifdef gpu
 CXXFLAGS   = -DWITHGPU -m64 -mssse3 -O3 -I. -I$(CUDA)/include
 LFLAGS     = -lpthread -L$(CUDA)/lib64 -lcudart
 else
-ifdef cpu
 CXXFLAGS   = -m64 -march=native -mtune=native -mssse3 -pthread -ftree-vectorize -flto -O3 -funroll-loops -finline-functions -I.
 LFLAGS     = -lpthread
-else
-CXXFLAGS   = -m64 -mssse3 -O3 -I. -I$(CUDA)/include
-LFLAGS     = -lpthread
-endif
 endif
 
 # Source and Object Files
@@ -30,7 +25,7 @@ ifdef gpu
 SRC += GPU/GPUEngine.cu
 OBJDIR = obj
 OBJET = $(addprefix $(OBJDIR)/, \
-      SECPK1/IntGroup.o main.o SECPK1/Random.o \
+      SECPK1/IntGroup.o Main.o SECPK1/Random.o \
       Timer.o SECPK1/Int.o SECPK1/IntMod.o \
       SECPK1/Point.o SECPK1/SECP256K1.o \
       GPU/GPUEngine.o Kangaroo.o HashTable.o Thread.o \
