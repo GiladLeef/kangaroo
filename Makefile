@@ -19,7 +19,7 @@ endif
 endif
 
 # Source and Object Files
-SRC = SECPK1/IntGroup.cpp main.cpp SECPK1/Random.cpp \
+SRC = SECPK1/IntGroup.cpp Main.cpp SECPK1/Random.cpp \
       Timer.cpp SECPK1/Int.cpp SECPK1/IntMod.cpp \
       SECPK1/Point.cpp SECPK1/SECP256K1.cpp \
       Kangaroo.cpp HashTable.cpp Thread.cpp Check.cpp \
