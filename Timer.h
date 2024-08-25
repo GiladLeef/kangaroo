@@ -3,7 +3,6 @@
 
 #include <time.h>
 #include <string>
-#include <cstdint>
 
 class Timer {
 
