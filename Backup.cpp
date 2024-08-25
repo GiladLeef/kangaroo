@@ -10,7 +10,6 @@
 
 using namespace std;
 
-
 // ----------------------------------------------------------------------------
 
 int Kangaroo::FSeek(FILE* stream,uint64_t pos) {
@@ -43,7 +42,6 @@ bool Kangaroo::IsEmpty(std::string fileName) {
 int Kangaroo::IsDir(string dirName) {
 
   bool isDir = 0;
-
   struct stat buffer;
   if(stat(dirName.c_str(),&buffer) != 0) {
     ::printf("%s not found\n",dirName.c_str());
@@ -98,7 +96,6 @@ FILE *Kangaroo::ReadHeader(std::string fileName, uint32_t *version, int type) {
   }
 
   return f;
-
 }
 
 bool Kangaroo::LoadWork(string &fileName) {
@@ -185,7 +182,7 @@ void Kangaroo::FetchWalks(uint64_t nbWalk,Int *x,Int *y,Int *d) {
 
 }
 
-void Kangaroo::FetchWalks(uint64_t nbWalk,std::vector<int128_t>& kangs,Int* x,Int* y,Int* d) {
+void Kangaroo::FetchWalks(uint64_t nbWalk,std::vector<int256_t>& kangs,Int* x,Int* y,Int* d) {
 
   uint64_t n = 0;
 
@@ -203,8 +200,7 @@ void Kangaroo::FetchWalks(uint64_t nbWalk,std::vector<int128_t>& kangs,Int* x,In
     for(n = 0; n < avail; n++) {
 
       Int dist;
-      uint32_t type;
-      HashTable::CalcDistAndType(kangs[n],&dist,&type);
+      HashTable::CalcDist(&kangs[n],&dist);
       dists.push_back(dist);
 
     }
@@ -232,7 +228,6 @@ void Kangaroo::FetchWalks(uint64_t nbWalk,std::vector<int128_t>& kangs,Int* x,In
     }
 
     kangs.erase(kangs.begin(),kangs.begin() + avail);
-
   }
 
   if(avail < nbWalk) {
@@ -240,7 +235,6 @@ void Kangaroo::FetchWalks(uint64_t nbWalk,std::vector<int128_t>& kangs,Int* x,In
     // Fill empty kanagaroo
     CreateHerd((int)empty,&(x[n]),&(y[n]),&(d[n]),TAME);
   }
-
 }
 
 void Kangaroo::FectchKangaroos(TH_PARAM *threads) {
@@ -248,7 +242,7 @@ void Kangaroo::FectchKangaroos(TH_PARAM *threads) {
   double sFetch = Timer::get_tick();
 
   // From server
-  vector<int128_t> kangs;
+  vector<int256_t> kangs;
   if(saveKangarooByServer) {
     ::printf("FectchKangaroosFromServer");
     if(!GetKangaroosFromServer(workFile,kangs))
@@ -256,7 +250,6 @@ void Kangaroo::FectchKangaroos(TH_PARAM *threads) {
     ::printf("Done\n");
     nbLoadedWalk = kangs.size();
   }
-
 
   // Fetch input kangaroo from file (if any)
   if(nbLoadedWalk>0) {
@@ -276,6 +269,27 @@ void Kangaroo::FectchKangaroos(TH_PARAM *threads) {
       else
         FetchWalks(CPU_GRP_SIZE,kangs,threads[i].px,threads[i].py,threads[i].distance);
     }
+
+#ifdef WITHGPU
+    for(int i = 0; i < nbGPUThread; i++) {
+      ::printf(".");
+      int id = nbCPUThread + i;
+      uint64_t n = threads[id].nbKangaroo;
+      threads[id].px = new Int[n];
+      threads[id].py = new Int[n];
+      threads[id].distance = new Int[n];
+      if(!saveKangarooByServer)
+          FetchWalks(n,
+            threads[id].px,
+            threads[id].py,
+            threads[id].distance);
+      else
+          FetchWalks(n,kangs,
+            threads[id].px,
+            threads[id].py,
+            threads[id].distance);
+    }
+#endif
 
     ::printf("Done\n");
 
@@ -426,22 +440,21 @@ void Kangaroo::SaveWork(uint64_t totalCount,double totalTime,TH_PARAM *threads,i
     if(saveKangarooByServer) {
 
       ::printf("\nSaveWork (Kangaroo->Server): %s",fileName.c_str());
-      vector<int128_t> kangs;
+      vector<int256_t> kangs;
       for(int i = 0; i < nbThread; i++)
         totalWalk += threads[i].nbKangaroo;
       kangs.reserve(totalWalk);
 
       for(int i = 0; i < nbThread; i++) {
-        int128_t X;
-        int128_t D;
-        uint64_t h;
+        int256_t X;
+        int256_t D;
         for(uint64_t n = 0; n < threads[i].nbKangaroo; n++) {
-          HashTable::Convert(&threads[i].px[n],&threads[i].distance[n],n%2,&h,&X,&D);
-          kangs.push_back(D);
+          HashTable::Convert(&threads[i].px[n],&threads[i].distance[n],&X,&D);
+	  kangs.push_back(D);
         }
       }
       SendKangaroosToServer(fileName,kangs);
-      size = kangs.size()*16 + 16;
+      size = kangs.size()*32 + 32;
       goto end;
 
     } else {
@@ -523,6 +536,7 @@ void Kangaroo::WorkInfo(std::string &fName) {
     return;
 
   int fd = fileno(f1);
+  posix_fadvise(fd,0,0,POSIX_FADV_RANDOM|POSIX_FADV_NOREUSE);
 
   uint32_t dp1;
   Point k1;

@@ -8,11 +8,8 @@
 #include <dirent.h>
 #include <pthread.h>
 #include <sys/stat.h>
-#include <iostream>
-#include <filesystem> 
-
+#define _strdup strdup
 using namespace std;
-namespace fs = std::filesystem;
 
 string Kangaroo::GetPartName(std::string& partName,int i,bool tmpPart) {
 
@@ -41,49 +38,51 @@ FILE * Kangaroo::OpenPart(std::string& partName,char *mode,int i,bool tmpPart) {
 }
 
 void Kangaroo::CreateEmptyPartWork(std::string& partName) {
-    try {
-        // Check if directory already exists
-        if (fs::exists(partName)) {
-            // Directory already exists
-            return;
-        }
 
-        // Create directory
-        fs::create_directory(partName);
 
-        // Header
-        string hName = partName + "/header";
-        FILE* f = fopen(hName.c_str(), "wb");
-        if (f == NULL) {
-            ::printf("CreateEmptyPartWork: Cannot open %s for writing\n", hName.c_str());
-            ::printf("%s\n", ::strerror(errno));
-            return;
-        }
-        fclose(f);
+  struct stat buffer;
+  if( stat(partName.c_str(),&buffer) == 0 ) {
+    ::printf("CreateEmptyPartWork: %s exists\n",partName.c_str());
+    return;
+  }
 
-        // Part
-        for (int i = 0; i < MERGE_PART; i++) {
-            FILE* f = OpenPart(partName, "wb", i);
-            if (f == NULL)
-                return;
+  if(mkdir(partName.c_str(),S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0) {
+    ::printf("mkdir(%s) Error:\n",partName.c_str());
+    perror("");
+    return;
+  }
 
-            for (int j = 0; j < H_PER_PART; j++) {
-                uint32_t z = 0;
-                fwrite(&z, sizeof(uint32_t), 1, f);
-                fwrite(&z, sizeof(uint32_t), 1, f);
-            }
+  // Header
+  string hName = partName + "/header";
+  FILE* f = fopen(hName.c_str(),"wb");
+  if(f == NULL) {
+    ::printf("CreateEmptyPartWork: Cannot open %s for writing\n",partName.c_str());
+    ::printf("%s\n",::strerror(errno));
+    return;
+  }
 
-            fclose(f);
-        }
+  fclose(f);
 
-        ::printf("CreateEmptyPartWork %s done\n", partName.c_str());
-    } catch (const fs::filesystem_error& ex) {
-        std::cerr << "Filesystem error: " << ex.what() << '\n';
-    } catch (const std::exception& ex) {
-        std::cerr << "Error: " << ex.what() << '\n';
-    } catch (...) {
-        std::cerr << "Unknown error occurred\n";
+  // Part
+  for(int i = 0; i < MERGE_PART; i++) {
+
+    FILE *f = OpenPart(partName,"wb",i);
+    if(f==NULL)
+      return;
+
+    for(int j = 0; j < H_PER_PART; j++) {
+      uint32_t z = 0;
+      fwrite(&z,sizeof(uint32_t),1,f);
+      fwrite(&z,sizeof(uint32_t),1,f);
     }
+
+    fclose(f);
+
+  }
+
+
+  ::printf("CreateEmptyPartWork %s done\n",partName.c_str());
+
 }
 
 bool Kangaroo::MergePartition(TH_PARAM* p) {
@@ -143,9 +142,10 @@ bool Kangaroo::MergePartition(TH_PARAM* p) {
   return true;
 
 }
+// Threaded proc
 extern void* _mergeThread(void* lpParam);
 
-
+// Threaded proc
 void* _mergePartThread(void* lpParam) {
   TH_PARAM* p = (TH_PARAM*)lpParam;
   p->obj->MergePartition(p);
@@ -327,8 +327,8 @@ bool Kangaroo::MergeWorkPartPart(std::string& part1Name,std::string& part2Name) 
       params[i].isRunning = true;
       params[i].hStart = p+i;
       params[i].hStop = 0;
-      params[i].part1Name = strdup(part1Name.c_str());
-      params[i].part2Name = strdup(part2Name.c_str());
+      params[i].part1Name = _strdup(part1Name.c_str());
+      params[i].part2Name = _strdup(part2Name.c_str());
       thHandles[i] = LaunchThread(_mergePartThread,params + i);
     }
 
@@ -359,7 +359,6 @@ bool Kangaroo::MergeWorkPartPart(std::string& part1Name,std::string& part2Name) 
     return true;
 
   }
-
 
   ::printf("Dead kangaroo: %" PRId64 "\n",collisionInSameHerd);
   ::printf("Total f1+f2: DP count 2^%.2f\n",log2((double)nbDP));

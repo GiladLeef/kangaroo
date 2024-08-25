@@ -2,10 +2,17 @@
 #define CONSTANTSH
 
 // Release number
-#define RELEASE "1.0"
+#define RELEASE "3.0.0"
 
 // Number of random jumps
+// Max 512 for the GPU
 #define NB_JUMP 32
+
+// GPU group size
+#define GPU_GRP_SIZE 128
+
+// GPU number of run per kernel call
+#define NB_RUN 64
 
 // Kangaroo type
 #define TAME 0  // Tame kangaroo
