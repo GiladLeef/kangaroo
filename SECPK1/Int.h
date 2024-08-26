@@ -8,16 +8,9 @@
 
 // We need 1 extra block for Knuth div algorithm , Montgomery multiplication and ModInv
 #define BISIZE 256
+#define NB64BLOCK 5
+#define NB32BLOCK 10
 
-#if BISIZE==256
-  #define NB64BLOCK 5
-  #define NB32BLOCK 10
-#elif BISIZE==512
-  #define NB64BLOCK 9
-  #define NB32BLOCK 18
-#else
-  #error Unsuported size
-#endif
 
 class Int {
 
@@ -271,12 +264,6 @@ static void inline imm_mul(uint64_t *x, uint64_t y, uint64_t *dst,uint64_t *carr
   c = _addcarry_u64(c, _umul128(x[2], y, &h), carry, dst + 2); carry = h;
   c = _addcarry_u64(c, _umul128(x[3], y, &h), carry, dst + 3); carry = h;
   c = _addcarry_u64(c, _umul128(x[4], y, &h), carry, dst + 4); carry = h;
-#if NB64BLOCK > 5
-  c = _addcarry_u64(c, _umul128(x[5], y, &h), carry, dst + 5); carry = h;
-  c = _addcarry_u64(c, _umul128(x[6], y, &h), carry, dst + 6); carry = h;
-  c = _addcarry_u64(c, _umul128(x[7], y, &h), carry, dst + 7); carry = h;
-  c = _addcarry_u64(c, _umul128(x[8], y, &h), carry, dst + 8); carry = h;
-#endif
   *carryH = carry;
 
 }
@@ -289,12 +276,6 @@ static void inline imm_imul(uint64_t* x,uint64_t y,uint64_t* dst,uint64_t* carry
   c = _addcarry_u64(c,_umul128(x[1],y,&h),carry,dst + 1); carry = h;
   c = _addcarry_u64(c,_umul128(x[2],y,&h),carry,dst + 2); carry = h;
   c = _addcarry_u64(c,_umul128(x[3],y,&h),carry,dst + 3); carry = h;
-#if NB64BLOCK > 5
-  c = _addcarry_u64(c,_umul128(x[4],y,&h),carry,dst + 4); carry = h;
-  c = _addcarry_u64(c,_umul128(x[5],y,&h),carry,dst + 5); carry = h;
-  c = _addcarry_u64(c,_umul128(x[6],y,&h),carry,dst + 6); carry = h;
-  c = _addcarry_u64(c,_umul128(x[7],y,&h),carry,dst + 7); carry = h;
-#endif
   c = _addcarry_u64(c,_mul128(x[NB64BLOCK - 1],y,(int64_t*)&h),carry,dst + NB64BLOCK - 1); carry = h;
   * carryH = carry;
 
@@ -309,12 +290,6 @@ static void inline imm_umul(uint64_t *x, uint64_t y, uint64_t *dst) {
   c = _addcarry_u64(c, _umul128(x[1], y, &h), carry, dst + 1); carry = h;
   c = _addcarry_u64(c, _umul128(x[2], y, &h), carry, dst + 2); carry = h;
   c = _addcarry_u64(c, _umul128(x[3], y, &h), carry, dst + 3); carry = h;
-#if NB64BLOCK > 5
-  c = _addcarry_u64(c, _umul128(x[4], y, &h), carry, dst + 4); carry = h;
-  c = _addcarry_u64(c, _umul128(x[5], y, &h), carry, dst + 5); carry = h;
-  c = _addcarry_u64(c, _umul128(x[6], y, &h), carry, dst + 6); carry = h;
-  c = _addcarry_u64(c, _umul128(x[7], y, &h), carry, dst + 7); carry = h;
-#endif
   _addcarry_u64(c, 0ULL, carry, dst + (NB64BLOCK - 1));
 
 }
@@ -325,12 +300,6 @@ static void inline shiftR(unsigned char n, uint64_t *d) {
   d[1] = __shiftright128(d[1], d[2], n);
   d[2] = __shiftright128(d[2], d[3], n);
   d[3] = __shiftright128(d[3], d[4], n);
-#if NB64BLOCK > 5
-  d[4] = __shiftright128(d[4], d[5], n);
-  d[5] = __shiftright128(d[5], d[6], n);
-  d[6] = __shiftright128(d[6], d[7], n);
-  d[7] = __shiftright128(d[7], d[8], n);
-#endif
   d[NB64BLOCK-1] = ((int64_t)d[NB64BLOCK-1]) >> n;
 
 }
@@ -341,12 +310,6 @@ static void inline shiftR(unsigned char n,uint64_t* d,uint64_t h) {
   d[1] = __shiftright128(d[1],d[2],n);
   d[2] = __shiftright128(d[2],d[3],n);
   d[3] = __shiftright128(d[3],d[4],n);
-#if NB64BLOCK > 5
-  d[4] = __shiftright128(d[4],d[5],n);
-  d[5] = __shiftright128(d[5],d[6],n);
-  d[6] = __shiftright128(d[6],d[7],n);
-  d[7] = __shiftright128(d[7],d[8],n);
-#endif
 
   d[NB64BLOCK-1] = __shiftright128(d[NB64BLOCK-1],h,n);
 
@@ -354,12 +317,6 @@ static void inline shiftR(unsigned char n,uint64_t* d,uint64_t h) {
 
 static void inline shiftL(unsigned char n, uint64_t *d) {
 
-#if NB64BLOCK > 5
-  d[8] = __shiftleft128(d[7], d[8], n);
-  d[7] = __shiftleft128(d[6], d[7], n);
-  d[6] = __shiftleft128(d[5], d[6], n);
-  d[5] = __shiftleft128(d[4], d[5], n);
-#endif
   d[4] = __shiftleft128(d[3], d[4], n);
   d[3] = __shiftleft128(d[2], d[3], n);
   d[2] = __shiftleft128(d[1], d[2], n);

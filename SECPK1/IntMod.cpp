@@ -514,35 +514,14 @@ void Int::MontgomeryMult(Int *a, Int *b) {
 
 void Int::ModMulK1(Int *a, Int *b) {
 
-#ifndef WIN64
-#if (__GNUC__ > 7) || (__GNUC__ == 7 && (__GNUC_MINOR__ > 2))
   unsigned char c;
-#else
-  #warning "GCC lass than 7.3 detected, upgrade gcc to get best perfromance"
-  volatile unsigned char c;
-#endif
-#else
-  unsigned char c;
-#endif
-
 
   uint64_t ah, al;
   uint64_t t[NB64BLOCK];
-#if BISIZE==256
   uint64_t r512[8];
   r512[5] = 0;
   r512[6] = 0;
   r512[7] = 0;
-#else
-  uint64_t r512[12];
-  r512[5] = 0;
-  r512[6] = 0;
-  r512[7] = 0;
-  r512[8] = 0;
-  r512[9] = 0;
-  r512[10] = 0;
-  r512[11] = 0;
-#endif
 
   // 256*256 multiplier
   imm_umul(a->bits64, b->bits64[0], r512);
@@ -600,21 +579,11 @@ void Int::ModMulK1(Int *a) {
 
   uint64_t ah, al;
   uint64_t t[NB64BLOCK];
-#if BISIZE==256
   uint64_t r512[8];
   r512[5] = 0;
   r512[6] = 0;
   r512[7] = 0;
-#else
-  uint64_t r512[12];
-  r512[5] = 0;
-  r512[6] = 0;
-  r512[7] = 0;
-  r512[8] = 0;
-  r512[9] = 0;
-  r512[10] = 0;
-  r512[11] = 0;
-#endif
+
 
 
   // 256*256 multiplier
@@ -658,31 +627,10 @@ void Int::ModMulK1(Int *a) {
 }
 
 void Int::ModSquareK1(Int *a) {
-
-#ifndef WIN64
-#if (__GNUC__ > 7) || (__GNUC__ == 7 && (__GNUC_MINOR__ > 2))
   unsigned char c;
-#else
-  #warning "GCC lass than 7.3 detected, upgrade gcc to get best perfromance"
-  volatile unsigned char c;
-#endif
-#else
-  unsigned char c;
-#endif
-
   uint64_t t[NB64BLOCK];
   uint64_t SL,SH;
-
-#if BISIZE==256
   uint64_t r512[8];
-#else
-  uint64_t r512[12];
-  r512[8] = 0;
-  r512[9] = 0;
-  r512[10] = 0;
-  r512[11] = 0;
-#endif
-
 #if 0
 
   // Line 0 (5 limbs)
