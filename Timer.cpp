@@ -1,15 +1,23 @@
+#ifdef WIN64
+#include <Windows.h> 
+#endif
 #include "Timer.h"
 
 static const char *prefix[] = { "","Kilo","Mega","Giga","Tera","Peta","Hexa" };
 
+
+#include <random>
+#include <sstream>
 #include <sys/time.h>
 #include <unistd.h>
 #include <string.h>
 time_t Timer::tickStart;
 
+
 void Timer::Init() {
 
   tickStart=time(NULL);
+
 }
 
 double Timer::get_tick() {
@@ -17,6 +25,7 @@ double Timer::get_tick() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return (double)(tv.tv_sec - tickStart) + (double)tv.tv_usec / 1e6;
+
 }
 
 uint32_t Timer::getSeed32() {
@@ -30,34 +39,21 @@ uint32_t Timer::getPID() {
 }
 
 std::string Timer::getSeed(int size) {
+    std::string ret;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, 255);
 
-  std::string ret;
-  char tmp[3];
-  unsigned char *buff = (unsigned char *)malloc(size);
+    for (int i = 0; i < size; i++) {
+        ret += static_cast<char>(dis(gen));
+    }
 
-
-  FILE *f = fopen("/dev/urandom","rb");
-  if(f==NULL) {
-    printf("Failed to open /dev/urandom %s\n", strerror( errno ));
-    exit(1);
-  }
-  if( fread(buff,1,size,f)!=size ) {
-    printf("Failed to read from /dev/urandom %s\n", strerror( errno ));
-    exit(1);
-  }
-  fclose(f);
-
-
-  for (int i = 0; i < size; i++) {
-    sprintf(tmp,"%02X",buff[i]);
-    ret.append(tmp);
-  }
-  
-  free(buff);
-  return ret;
-
+    std::stringstream ss;
+    for (int i = 0; i < size; i++) {
+        ss << std::hex << static_cast<int>(ret[i]);
+    }
+    return ss.str();
 }
-
 
 std::string Timer::getResult(char *unit, int nbTry, double t0, double t1) {
 
@@ -81,13 +77,23 @@ void Timer::printResult(char *unit, int nbTry, double t0, double t1) {
 
 int Timer::getCoreNumber() {
 
+#ifdef WIN64
+  SYSTEM_INFO sysinfo;
+  GetSystemInfo(&sysinfo);
+  return sysinfo.dwNumberOfProcessors;
+#else
   return (size_t)sysconf(_SC_NPROCESSORS_ONLN);
+#endif
 
 }
 
 void Timer::SleepMillis(uint32_t millis) {
 
+#ifdef WIN64
+  Sleep(millis);
+#else
   usleep(millis*1000);
+#endif
 
 }
 

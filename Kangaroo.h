@@ -1,6 +1,17 @@
 #ifndef KANGAROOH
 #define KANGAROOH
 
+#include <pthread.h> // Include pthread.h
+#include <string>
+#include <vector>
+#include <signal.h> 
+#include "Constants.h"
+
+#ifdef WIN64
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock2.h>
+#else
 typedef int SOCKET;
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -11,14 +22,11 @@ typedef int SOCKET;
 #include <sys/time.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
-#include <signal.h>
+#endif
 
-#include <string>
-#include <vector>
 #include "SECPK1/SECP256k1.h"
 #include "HashTable.h"
 #include "SECPK1/IntGroup.h"
-#include "GPU/GPUEngine.h"
 
 typedef pthread_t THREAD_HANDLE;
 #define LOCK(mutex)  pthread_mutex_lock(&(mutex));
@@ -36,15 +44,10 @@ typedef struct {
   bool isWaiting;
   uint64_t nbKangaroo;
 
-#ifdef WITHGPU
-  int  gridSizeX;
-  int  gridSizeY;
-  int  gpuId;
-#endif
-
   Int *px; // Kangaroo position
   Int *py; // Kangaroo position
   Int *distance; // Travelled distance
+  
   SOCKET clientSock;
   char  *clientInfo;
 
@@ -60,8 +63,9 @@ typedef struct {
 typedef struct {
 
   uint32_t kIdx;
-  int256_t x;
-  int256_t d;
+  uint32_t h;
+  int128_t x;
+  int128_t d;
 
 } DP;
 
@@ -71,7 +75,6 @@ typedef struct {
   uint32_t nbDP;
   uint32_t threadId;
   uint32_t processId;
-  uint32_t gpuId;
 
 } DPHEADER;
 
@@ -93,14 +96,14 @@ class Kangaroo {
 
 public:
 
-  Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,std::string &workFile,std::string &iWorkFile,
+  Kangaroo(Secp256K1 *secp,int32_t initDPSize,std::string &workFile,std::string &iWorkFile,
            uint32_t savePeriod,bool saveKangaroo,bool saveKangarooByServer,double maxStep,int wtimeout,int sport,int ntimeout,
            std::string serverIp,std::string outputFile,bool splitWorkfile);
-  void Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize);
+  void Run(int nbThread);
   void RunServer();
   bool ParseConfigFile(std::string &fileName);
   bool LoadWork(std::string &fileName);
-  void Check(std::vector<int> gpuId,std::vector<int> gridSize);
+  void Check();
   void MergeDir(std::string& dirname,std::string& dest);
   bool MergeWork(std::string &file1,std::string &file2,std::string &dest,bool printStat=true);
   void WorkInfo(std::string &fileName);
@@ -113,7 +116,6 @@ public:
 
   // Threaded procedures
   void SolveKeyCPU(TH_PARAM *p);
-  void SolveKeyGPU(TH_PARAM *p);
   bool HandleRequest(TH_PARAM *p);
   bool MergePartition(TH_PARAM* p);
   bool CheckPartition(TH_PARAM* p);
@@ -126,17 +128,15 @@ public:
 
 private:
 
-  bool IsDP(Int *x);
+  bool IsDP(uint64_t x);
   void SetDP(int size);
   void CreateHerd(int nbKangaroo,Int *px, Int *py, Int *d, int firstType,bool lock=true);
   void CreateJumpTable();
-  bool AddToTable(uint64_t h,int256_t *x,int256_t *d);
-  bool AddToTable(int256_t *x,int256_t *d, uint32_t kType);
-  bool AddToTable(uint64_t h, int256_t *x,int256_t *d, uint32_t kType);
-  bool AddToTable(Int *pos,Int *dist, uint32_t kType);
-  bool SendToServer(std::vector<ITEM> &dp,uint32_t threadId,uint32_t gpuId);
+  bool AddToTable(uint64_t h,int128_t *x,int128_t *d);
+  bool AddToTable(Int *pos,Int *dist,uint32_t kType);
+  bool SendToServer(std::vector<ITEM> &dp,uint32_t threadId);
   bool CheckKey(Int d1,Int d2,uint8_t type);
-  bool CollisionCheck(Int* d1, uint32_t type1,Int* d2, uint32_t type2);
+  bool CollisionCheck(Int* d1,uint32_t type1,Int* d2,uint32_t type2);
   void ComputeExpected(double dp,double *op,double *ram,double* overHead = NULL);
   void InitRange();
   void InitSearchKey();
@@ -148,7 +148,7 @@ private:
   void SaveWork(uint64_t totalCount,double totalTime,TH_PARAM *threads,int nbThread);
   void SaveServerWork();
   void FetchWalks(uint64_t nbWalk,Int *x,Int *y,Int *d);
-  void FetchWalks(uint64_t nbWalk,std::vector<int256_t>& kangs,Int* x,Int* y,Int* d);
+  void FetchWalks(uint64_t nbWalk,std::vector<int128_t>& kangs,Int* x,Int* y,Int* d);
   void FectchKangaroos(TH_PARAM *threads);
   FILE *ReadHeader(std::string fileName,uint32_t *version,int type);
   bool  SaveHeader(std::string fileName,FILE* f,int type,uint64_t totalCount,double totalTime);
@@ -171,8 +171,8 @@ private:
   void InitSocket();
   void WaitForServer();
   int32_t GetServerStatus();
- bool SendKangaroosToServer(std::string& fileName,std::vector<int256_t>& kangs);
-  bool GetKangaroosFromServer(std::string& fileName,std::vector<int256_t>& kangs);
+  bool SendKangaroosToServer(std::string& fileName,std::vector<int128_t>& kangs);
+  bool GetKangaroosFromServer(std::string& fileName,std::vector<int128_t>& kangs);
 
   pthread_mutex_t  ghMutex;
   pthread_mutex_t  saveMutex;
@@ -183,7 +183,6 @@ private:
   void Process(TH_PARAM *params,std::string unit);
 
   uint64_t getCPUCount();
-  uint64_t getGPUCount();
   bool isAlive(TH_PARAM *p);
   bool hasStarted(TH_PARAM *p);
   bool isWaiting(TH_PARAM *p);
@@ -192,7 +191,6 @@ private:
   HashTable hashTable;
   uint64_t counters[256];
   int  nbCPUThread;
-  int  nbGPUThread;
   double startTime;
 
   // Range
@@ -204,7 +202,7 @@ private:
   Int rangeWidthDiv4;
   Int rangeWidthDiv8;
 
-  int256_t dMask;
+  uint64_t dMask;
   uint32_t dpSize;
   int32_t initDPSize;
   uint64_t collisionInSameHerd;
@@ -213,7 +211,6 @@ private:
   Point keyToSearchNeg;
   uint32_t keyIdx;
   bool endOfSearch;
-  bool useGpu;
   double expectedNbOp;
   double expectedMem;
   double maxStep;

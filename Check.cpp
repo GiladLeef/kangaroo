@@ -2,144 +2,104 @@
 #include <fstream>
 #include "SECPK1/IntGroup.h"
 #include "Timer.h"
-#include <string.h>
-#include <math.h>
-#include <algorithm>
-#include <pthread.h>
-#define _strdup strdup
-
+#include <string>
+#include <vector>
+#include <iostream>
+#include <memory>
+#include <thread>
+#include <atomic>
+#include <cmath>
+#include <cstring>
 using namespace std;
 
-uint32_t Kangaroo::CheckHash(uint32_t h,uint32_t nbItem,HashTable* hT,FILE* f) {
+uint32_t Kangaroo::CheckHash(uint32_t h, uint32_t nbItem, HashTable* hT, FILE* f) {
+    bool ok = true;
+    vector<Int> dists;
+    vector<uint32_t> types;
+    Point Z;
+    Z.Clear();
+    uint32_t nbWrong = 0;
 
-  bool ok=true;
-  vector<Int> dists;
-  vector<uint32_t> types;
-  Point Z;
-  Z.Clear();
-  uint32_t nbWrong = 0;
-  ENTRY *items = NULL;
-  ENTRY* e;
-
-  if( hT ) {
-
-    for(uint32_t i = 0; i < nbItem; i++) {
-      e = hT->E[h].items[i];
-      Int dist;
-      uint32_t kType = e->kType;
-      HashTable::CalcDist(&(e->d),&dist);
-      dists.push_back(dist);
-      types.push_back(kType);
+    unique_ptr<ENTRY[]> items;
+    if (!hT) {
+        items = make_unique<ENTRY[]>(nbItem);
+        fread(items.get(), sizeof(ENTRY), nbItem, f);
     }
 
-  } else {
-
-    items = (ENTRY*)malloc(nbItem * sizeof(ENTRY));
-
-    for(uint32_t i = 0; i < nbItem; i++) {
-      ::fread(items+i,32,1,f);
-      e = items + i;
-      Int dist;
-      uint32_t kType = e->kType;
-      HashTable::CalcDist(&(e->d),&dist);
-      dists.push_back(dist);
-      types.push_back(kType);
+    for (uint32_t i = 0; i < nbItem; i++) {
+        const ENTRY* e = hT ? hT->E[h].items[i] : &items[i];
+        Int dist;
+        uint32_t kType;
+        HashTable::CalcDistAndType(e->d, &dist, &kType);
+        dists.push_back(dist);
+        types.push_back(kType);
     }
 
-  }
-
-  vector<Point> P = secp->ComputePublicKeys(dists);
-  vector<Point> Sp;
-
-  for(uint32_t i = 0; i < nbItem; i++) {
-
-    if(types[i] == TAME) {
-      Sp.push_back(Z);
-    } else {
-      Sp.push_back(keyToSearch);
+    vector<Point> P = secp->ComputePublicKeys(dists);
+    vector<Point> Sp;
+    for (uint32_t i = 0; i < nbItem; i++) {
+        if (types[i] == TAME) {
+            Sp.push_back(Z);
+        } else {
+            Sp.push_back(keyToSearch);
+        }
     }
 
-  }
+    vector<Point> S = secp->AddDirect(Sp, P);
+    for (uint32_t i = 0; i < nbItem; i++) {
+        const ENTRY* e = hT ? hT->E[h].items[i] : &items[i];
+        uint32_t hC = S[i].x.bits64[2] & HASH_MASK;
+        ok = (hC == h) && (S[i].x.bits64[0] == e->x.i64[0]) && (S[i].x.bits64[1] == e->x.i64[1]);
+        if (!ok) nbWrong++;
+    }
 
-  vector<Point> S = secp->AddDirect(Sp,P);
-
-  for(uint32_t i = 0; i < nbItem; i++) {
-
-    if(hT)    e = hT->E[h].items[i];
-    else      e = items + i;
-
-    ok = (S[i].x.bits64[0] == e->x.i64[0]) && (S[i].x.bits64[1] == e->x.i64[1]) && (S[i].x.bits64[2] == e->x.i64[2]) && (S[i].x.bits64[3] == e->x.i64[3]);;
-    if(!ok) nbWrong++;
-
-  }
-
-  if(items) free(items);
-  return nbWrong;
-
+    return nbWrong;
 }
 
 bool Kangaroo::CheckPartition(TH_PARAM* p) {
+    uint32_t part = p->hStart;
+    string pName = string(p->part1Name);
+    ifstream f1(pName + "/header", ios::binary);
+    if (!f1.is_open()) return false;
 
-  uint32_t part = p->hStart;
-  string pName = string(p->part1Name);
+    uint32_t hStart = part * (HASH_SIZE / MERGE_PART);
+    uint32_t hStop = (part + 1) * (HASH_SIZE / MERGE_PART);
+    p->hStart = 0;
 
-  FILE* f1 = OpenPart(pName,"rb",part,false);
-  if(f1 == NULL) return false;
+    for (uint32_t h = hStart; h < hStop; h++) {
+        uint32_t nbItem, maxItem;
+        f1.read(reinterpret_cast<char*>(&nbItem), sizeof(uint32_t));
+        f1.read(reinterpret_cast<char*>(&maxItem), sizeof(uint32_t));
+        if (nbItem == 0) continue;
+        p->hStop += CheckHash(h, nbItem, nullptr, nullptr);
+        p->hStart += nbItem;
+    }
 
-  uint32_t hStart = part * (HASH_SIZE / MERGE_PART);
-  uint32_t hStop = (part + 1) * (HASH_SIZE / MERGE_PART);
-  p->hStart = 0;
-
-  for(uint32_t h = hStart; h < hStop; h++) {
-
-    uint32_t nbItem;
-    uint32_t maxItem;
-    ::fread(&nbItem,sizeof(uint32_t),1,f1);
-    ::fread(&maxItem,sizeof(uint32_t),1,f1);
-
-    if(nbItem == 0)
-      continue;
-    p->hStop += CheckHash(h,nbItem,NULL,f1);
-    p->hStart += nbItem;
-
-  }
-
-  ::fclose(f1);
-  return true;
-
+    return true;
 }
 
 bool Kangaroo::CheckWorkFile(TH_PARAM* p) {
-
-  uint32_t nWrong = 0;
-
-  for(uint32_t h = p->hStart; h < p->hStop; h++) {
-
-    if(hashTable.E[h].nbItem == 0)
-      continue;
-    nWrong += CheckHash(h,hashTable.E[h].nbItem,&hashTable,NULL);
-
-  }
-
-  p->hStop = nWrong;
-
-  return true;
-
+    uint32_t nWrong = 0;
+    for (uint32_t h = p->hStart; h < p->hStop; h++) {
+        if (hashTable.E[h].nbItem == 0) continue;
+        nWrong += CheckHash(h, hashTable.E[h].nbItem, &hashTable, nullptr);
+    }
+    p->hStop = nWrong;
+    return true;
 }
 
-// Threaded proc
 void* _checkPartThread(void* lpParam) {
-  TH_PARAM* p = (TH_PARAM*)lpParam;
-  p->obj->CheckPartition(p);
-  p->isRunning = false;
-  return 0;
+    auto p = reinterpret_cast<TH_PARAM*>(lpParam);
+    p->obj->CheckPartition(p);
+    p->isRunning = false;
+    return nullptr;
 }
 
 void* _checkWorkThread(void* lpParam) {
-  TH_PARAM* p = (TH_PARAM*)lpParam;
-  p->obj->CheckWorkFile(p);
-  p->isRunning = false;
-  return 0;
+    auto p = reinterpret_cast<TH_PARAM*>(lpParam);
+    p->obj->CheckWorkFile(p);
+    p->isRunning = false;
+    return nullptr;
 }
 
 void Kangaroo::CheckPartition(int nbCore,std::string& partName) {
@@ -212,7 +172,7 @@ void Kangaroo::CheckPartition(int nbCore,std::string& partName) {
       params[i].isRunning = true;
       params[i].hStart = p + i;
       params[i].hStop = 0;
-      params[i].part1Name = _strdup(partName.c_str());
+      params[i].part1Name = strdup(partName.c_str());
       thHandles[i] = LaunchThread(_checkPartThread,params + i);
     }
 
@@ -252,6 +212,7 @@ void Kangaroo::CheckWorkFile(int nbCore,std::string& fileName) {
   uint32_t v1;
 
   setvbuf(stdout,NULL,_IONBF,0);
+
   if(IsDir(fileName)) {
     CheckPartition(nbCore,fileName);
     return;
@@ -352,7 +313,6 @@ void Kangaroo::CheckWorkFile(int nbCore,std::string& fileName) {
 
   ::printf("[%.3f%% OK][%s]\n",O,GetTimeStr(t1 - t0).c_str());
   if(nbWrong > 0) {
-
     ::printf("DP: %" PRId64 "\n",nbDP);
     ::printf("DP Wrong: %" PRId64 "\n",nbWrong);
 
@@ -361,7 +321,7 @@ void Kangaroo::CheckWorkFile(int nbCore,std::string& fileName) {
 }
 
 
-void Kangaroo::Check(std::vector<int> gpuId,std::vector<int> gridSize) {
+void Kangaroo::Check() {
 
   Int::Check();
 
@@ -405,153 +365,5 @@ void Kangaroo::Check(std::vector<int> gpuId,std::vector<int> gridSize) {
     ::printf("%s\n",pts1[i].toString().c_str());
     ::printf("%s\n",pts2[i].toString().c_str());
   }
-
-  /*
-  // Check jump table
-  for(int i=0;i<128;i++) {
-    rangePower = i;
-    CreateJumpTable();  
-  }
-  */
-
-#ifdef WITHGPU
-
-  // Check gpu
-  if(useGpu) {
-
-    rangePower = 64;
-    rangeStart.SetBase16("5B3F38AF935A3640D158E871CE6E9666DB862636383386EE0000000000000000");
-    rangeEnd.SetBase16("5B3F38AF935A3640D158E871CE6E9666DB862636383386EEFFFFFFFFFFFFFFFF");
-    Int k1;
-    k1.SetBase16("5B3F38AF935A3640D158E871CE6E9666DB862636383386EE0000000000123000");
-    Point P = secp->ComputePublicKey(&k1);
-    CreateJumpTable();
-    keysToSearch.clear();
-    keysToSearch.push_back(P);
-    keyIdx = 0;
-    InitRange();
-    InitSearchKey();
-
-    ::printf("GPU allocate memory:");
-    int x = gridSize[0];
-    int y = gridSize[1];
-    if(!GPUEngine::GetGridSize(gpuId[0],&x,&y)) {
-      return;
-    }
-
-    GPUEngine h(x,y,gpuId[0],65536);
-    ::printf(" done\n");
-    ::printf("GPU: %s\n",h.deviceName.c_str());
-    ::printf("GPU: %.1f MB\n",h.GetMemory() / 1048576.0);
-
-    int nb = h.GetNbThread() * GPU_GRP_SIZE;
-
-    Int *gpuPx = new Int[nb];
-    Int *gpuPy = new Int[nb];
-    Int *gpuD = new Int[nb];
-    Int *cpuPx = new Int[nb];
-    Int *cpuPy = new Int[nb];
-    Int *cpuD = new Int[nb];
-    uint64_t *lastJump = new uint64_t[nb];
-    vector<ITEM> gpuFound;
-
-    Int pk;
-    pk.Rand(256);
-    keyToSearch = secp->ComputePublicKey(&pk);
-
-    CreateHerd(nb,cpuPx,cpuPy,cpuD,TAME);
-    for(int i=0;i<nb;i++) lastJump[i]=NB_JUMP;
-
-    CreateJumpTable();
-    
-    Int dMaskInt;
-    HashTable::toInt(&dMask,&dMaskInt);
-    h.SetParams(&dMaskInt,jumpDistance,jumpPointx,jumpPointy);
-    h.SetWildOffset(&rangeWidthDiv2);
-    h.SetKangaroos(cpuPx,cpuPy,cpuD);
-
-    // Test single
-    uint64_t r = rndl() % nb;
-    CreateHerd(1,&cpuPx[r],&cpuPy[r],&cpuD[r],r % 2);
-    h.SetKangaroo(r,&cpuPx[r],&cpuPy[r],&cpuD[r]);
-
-    h.Launch(gpuFound);
-    h.GetKangaroos(gpuPx,gpuPy,gpuD);
-    h.Launch(gpuFound);
-    ::printf("DP found: %d\n",(int)gpuFound.size());
-
-    // Do the same on CPU
-    Int _1;
-    _1.SetInt32(1);
-    for(int r = 0; r<NB_RUN; r++) {
-      for(int i = 0; i<nb; i++) {
-        uint64_t jmp = (cpuPx[i].bits64[0] % NB_JUMP);
-
-        Point J(&jumpPointx[jmp],&jumpPointy[jmp],&_1);
-        Point P(&cpuPx[i],&cpuPy[i],&_1);
-        P = secp->AddDirect(P,J);
-        cpuPx[i].Set(&P.x);
-        cpuPy[i].Set(&P.y);
-
-        cpuD[i].ModAddK1order(&jumpDistance[jmp]);
-
-        if(IsDP(&cpuPx[i])) {
-
-          // Search for DP found
-          bool found = false;
-          int j = 0;
-          while(!found && j<(int)gpuFound.size()) {
-            found = gpuFound[j].x.IsEqual(&cpuPx[i]) &&
-              gpuFound[j].d.IsEqual(&cpuD[i]) &&
-              gpuFound[j].kIdx == (uint64_t)i;
-            if(!found) j++;
-          }
-
-          if(found) {
-            gpuFound.erase(gpuFound.begin() + j);
-          } else {
-            ::printf("DP Mismatch:\n");
-            ::printf("[%d] %s [0x%" PRIx64 "]\n",j,gpuFound[j].x.GetBase16().c_str(),gpuFound[j].kIdx);
-#endif
-            ::printf("[%d] %s \n",i,cpuPx[gpuFound[i].kIdx].GetBase16().c_str());
-            return;
-          }
-
-        }
-
-      }
-    }
-
-    // Compare kangaroos
-    int nbFault = 0;
-    bool firstFaut = true;
-    for(int i = 0; i<nb; i++) {
-      bool ok = gpuPx[i].IsEqual(&cpuPx[i]) && gpuPy[i].IsEqual(&cpuPy[i]) &&
-                gpuD[i].IsEqual(&cpuD[i]);
-      if(!ok) {
-        nbFault++;
-        if(firstFaut) {
-          ::printf("CPU Kx=%s\n",cpuPx[i].GetBase16().c_str());
-          ::printf("CPU Ky=%s\n",cpuPy[i].GetBase16().c_str());
-          ::printf("CPU Kd=%s\n",cpuD[i].GetBase16().c_str());
-          ::printf("GPU Kx=%s\n",gpuPx[i].GetBase16().c_str());
-          ::printf("GPU Ky=%s\n",gpuPy[i].GetBase16().c_str());
-          ::printf("GPU Kd=%s\n",gpuD[i].GetBase16().c_str());
-          firstFaut = false;
-        }
-      }
-
-    }
-
-    if(nbFault) {
-      ::printf("CPU/GPU not ok: %d/%d faults\n",nbFault,nb);
-      return;
-    }
-
-    // Comapre DP
-    ::printf("CPU/GPU ok\n");
-
-  }
-
 
 }

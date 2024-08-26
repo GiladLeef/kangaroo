@@ -28,7 +28,7 @@ void  Kangaroo::FreeHandles(THREAD_HANDLE *handles, int nbThread) {
 bool Kangaroo::isAlive(TH_PARAM *p) {
 
   bool isAlive = false;
-  int total = nbCPUThread + nbGPUThread;
+  int total = nbCPUThread;
   for(int i=0;i<total;i++)
     isAlive = isAlive || p[i].isRunning;
 
@@ -41,7 +41,7 @@ bool Kangaroo::isAlive(TH_PARAM *p) {
 bool Kangaroo::hasStarted(TH_PARAM *p) {
 
   bool hasStarted = true;
-  int total = nbCPUThread + nbGPUThread;
+  int total = nbCPUThread;
   for (int i = 0; i < total; i++)
     hasStarted = hasStarted && p[i].hasStarted;
 
@@ -54,7 +54,7 @@ bool Kangaroo::hasStarted(TH_PARAM *p) {
 bool Kangaroo::isWaiting(TH_PARAM *p) {
 
   bool isWaiting = true;
-  int total = nbCPUThread + nbGPUThread;
+  int total = nbCPUThread;
   for (int i = 0; i < total; i++)
     isWaiting = isWaiting && p[i].isWaiting;
 
@@ -62,16 +62,6 @@ bool Kangaroo::isWaiting(TH_PARAM *p) {
 
 }
 
-// ----------------------------------------------------------------------------
-
-uint64_t Kangaroo::getGPUCount() {
-
-  uint64_t count = 0;
-  for(int i = 0; i<nbGPUThread; i++)
-    count += counters[0x80L + i];
-  return count;
-
-}
 
 // ----------------------------------------------------------------------------
 
@@ -128,69 +118,51 @@ string Kangaroo::GetTimeStr(double dTime) {
 
 // Wait for end of server and dispay stats
 void Kangaroo::ProcessServer() {
+    pthread_mutex_init(&ghMutex, NULL);
+    setvbuf(stdout, NULL, _IONBF, 0);
 
-  double t0;
-  double t1;
-  t0 = Timer::get_tick();
-  startTime = t0;
-  double lastSave = 0;
+    double t0 = Timer::get_tick();
+    double lastSave = 0;
 
-  // Acquire mutex ownership
-  pthread_mutex_init(&ghMutex, NULL);
-  setvbuf(stdout, NULL, _IONBF, 0);
+    while (!endOfSearch) {
+        double t1 = Timer::get_tick();
+        LOCK(ghMutex);
+        localCache.assign(recvDP.begin(), recvDP.end());
+        recvDP.clear();
+        UNLOCK(ghMutex);
 
-  while(!endOfSearch) {
-
-    t0 = Timer::get_tick();
-
-    LOCK(ghMutex);
-    // Get back all dps
-    localCache.clear();
-    for(int i=0;i<(int)recvDP.size();i++)
-      localCache.push_back(recvDP[i]);
-    recvDP.clear();
-    UNLOCK(ghMutex);
-
-    // Add to hashTable
-    for(int i = 0; i<(int)localCache.size() && !endOfSearch; i++) {
-      DP_CACHE dp = localCache[i];
-      for(int j = 0; j<(int)dp.nbDP && !endOfSearch; j++) {
-        if(!AddToTable(&dp.dp[j].x,&dp.dp[j].d,dp.dp[j].kIdx % 2)) {
-          // Collision inside the same herd
-          collisionInSameHerd++;
+        for (const auto& dp : localCache) {
+            for (int j = 0; j < dp.nbDP && !endOfSearch; j++) {
+                uint64_t h = dp.dp[j].h;
+                if (!AddToTable(h, &dp.dp[j].x, &dp.dp[j].d)) {
+                    collisionInSameHerd++;
+                }
+            }
+            free(dp.dp);
         }
-      }
-      free(dp.dp);
+
+        double elapsedTime = Timer::get_tick() - t1;
+        double toSleep = std::max(0.0, SEND_PERIOD - elapsedTime);
+        Timer::SleepMillis(static_cast<uint32_t>(toSleep * 1000.0));
+
+        if (!endOfSearch) {
+            printf("\r[Client %d][Kang 2^%.2f][DP Count 2^%.2f/2^%.2f][Dead %.0f][%s][%s]  ",
+                   connectedClient,
+                   log2((double)totalRW),
+                   log2((double)hashTable.GetNbItem()),
+                   log2(expectedNbOp / pow(2.0, dpSize)),
+                   (double)collisionInSameHerd,
+                   GetTimeStr(Timer::get_tick() - startTime).c_str(),
+                   hashTable.GetSizeInfo().c_str());
+        }
+
+        if (!workFile.empty() && !endOfSearch) {
+            if ((Timer::get_tick() - lastSave) > saveWorkPeriod) {
+                SaveServerWork();
+                lastSave = Timer::get_tick();
+            }
+        }
     }
-
-    t1 = Timer::get_tick();
-
-    double toSleep = SEND_PERIOD - (t1-t0);
-    if(toSleep<0) toSleep = 0.0;
-    Timer::SleepMillis((uint32_t)(toSleep*1000.0));
-
-    t1 = Timer::get_tick();
-
-    if(!endOfSearch)
-      printf("[+] [Client %d][Kang 2^%.2f][DP Count 2^%.2f/2^%.2f][Dead %.0f][%s][%s]\r",
-        connectedClient,
-        log2((double)totalRW),
-        log2((double)hashTable.GetNbItem()),
-        log2(expectedNbOp / pow(2.0,dpSize)),
-        (double)collisionInSameHerd,
-        GetTimeStr(t1 - startTime).c_str(),
-        hashTable.GetSizeInfo().c_str()
-        );
-
-    if(workFile.length() > 0 && !endOfSearch) {
-      if((t1 - lastSave) > saveWorkPeriod) {
-        SaveServerWork();
-        lastSave = t1;
-      }
-    }
-
-  }
-
 }
 
 // Wait for end of threads and display stats
@@ -201,24 +173,19 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
 
   uint64_t count;
   uint64_t lastCount = 0;
-  uint64_t gpuCount = 0;
-  uint64_t lastGPUCount = 0;
   double avgKeyRate = 0.0;
-  double avgGpuKeyRate = 0.0;
   double lastSave = 0;
 
   setvbuf(stdout, NULL, _IONBF, 0);
+
   // Key rate smoothing filter
 #define FILTER_SIZE 8
   double lastkeyRate[FILTER_SIZE];
-  double lastGpukeyRate[FILTER_SIZE];
   uint32_t filterPos = 0;
 
   double keyRate = 0.0;
-  double gpuKeyRate = 0.0;
 
   memset(lastkeyRate,0,sizeof(lastkeyRate));
-  memset(lastGpukeyRate,0,sizeof(lastkeyRate));
 
   // Wait that all threads have started
   while(!hasStarted(params))
@@ -226,8 +193,7 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
 
   t0 = Timer::get_tick();
   startTime = t0;
-  lastGPUCount = getGPUCount();
-  lastCount = getCPUCount() + gpuCount;
+  lastCount = getCPUCount();
 
   while(isAlive(params)) {
 
@@ -237,40 +203,33 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
       delay -= 50;
     }
 
-    gpuCount = getGPUCount();
-    count = getCPUCount() + gpuCount;
+    count = getCPUCount();
 
     t1 = Timer::get_tick();
     keyRate = (double)(count - lastCount) / (t1 - t0);
-    gpuKeyRate = (double)(gpuCount - lastGPUCount) / (t1 - t0);
     lastkeyRate[filterPos%FILTER_SIZE] = keyRate;
-    lastGpukeyRate[filterPos%FILTER_SIZE] = gpuKeyRate;
     filterPos++;
 
     // KeyRate smoothing
     uint32_t nbSample;
     for(nbSample = 0; (nbSample < FILTER_SIZE) && (nbSample < filterPos); nbSample++) {
       avgKeyRate += lastkeyRate[nbSample];
-      avgGpuKeyRate += lastGpukeyRate[nbSample];
     }
     avgKeyRate /= (double)(nbSample);
-    avgGpuKeyRate /= (double)(nbSample);
     double expectedTime = expectedNbOp / avgKeyRate;
 
     // Display stats
     if(isAlive(params) && !endOfSearch) {
       if(clientMode) {
-        printf("[+] [%.2f %s][GPU %.2f %s][Count 2^%.2f][%s][Server %6s] \r",
+        printf("\r[%.2f %s][Count 2^%.2f][%s][Server %6s]  ",
           avgKeyRate / 1000000.0,unit.c_str(),
-          avgGpuKeyRate / 1000000.0,unit.c_str(),
           log2((double)count + offsetCount),
           GetTimeStr(t1 - startTime + offsetTime).c_str(),
           serverStatus.c_str()
           );
       } else {
-        printf("[+] [%.2f %s][GPU %.2f %s][Count 2^%.2f][Dead %.0f][%s (Avg %s)][%s] \r",
+        printf("\r[%.2f %s][Count 2^%.2f][Dead %.0f][%s (Avg %s)][%s]  ",
           avgKeyRate / 1000000.0,unit.c_str(),
-          avgGpuKeyRate / 1000000.0,unit.c_str(),
           log2((double)count + offsetCount),
           (double)collisionInSameHerd,
           GetTimeStr(t1 - startTime + offsetTime).c_str(),GetTimeStr(expectedTime).c_str(),
@@ -283,7 +242,7 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
     // Save request
     if(workFile.length() > 0 && !endOfSearch) {
       if((t1 - lastSave) > saveWorkPeriod) {
-        SaveWork(count + offsetCount,t1 - startTime + offsetTime,params,nbCPUThread + nbGPUThread);
+        SaveWork(count + offsetCount,t1 - startTime + offsetTime,params,nbCPUThread);
         lastSave = t1;
       }
     }
@@ -300,21 +259,20 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
     }
 
     lastCount = count;
-    lastGPUCount = gpuCount;
     t0 = t1;
 
   }
 
-  count = getCPUCount() + getGPUCount();
+  count = getCPUCount();
   t1 = Timer::get_tick();
   
   if( !endOfSearch ) {
-    printf("\r[%.2f %s][GPU %.2f %s][Cnt 2^%.2f][%s]  ",
+    printf("\r[%.2f %s][Cnt 2^%.2f][%s]  ",
       avgKeyRate / 1000000.0,unit.c_str(),
-      avgGpuKeyRate / 1000000.0,unit.c_str(),
       log2((double)count),
       GetTimeStr(t1 - startTime).c_str()
       );
   }
 
 }
+

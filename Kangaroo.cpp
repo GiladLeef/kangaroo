@@ -1,31 +1,26 @@
-#include <string.h>
-#include <fstream>
+#include <signal.h>
 #include "Kangaroo.h"
+#include <fstream>
 #include "SECPK1/IntGroup.h"
 #include "Timer.h"
+#include <string.h>
 #include <math.h>
 #include <algorithm>
-#include <memory>
 #include <pthread.h>
+#include <signal.h>
+#include <iostream>
 
 using namespace std;
 
-#define safe_delete_array(x) \
-  if (x) {                   \
-    delete[] x;              \
-    x = NULL;                \
-  }
+#define safe_delete_array(x) if(x) {delete[] x;x=NULL;}
 
 // ----------------------------------------------------------------------------
 
-Kangaroo::Kangaroo(Secp256K1 *secp, int32_t initDPSize, bool useGpu,
-                   string &workFile, string &iWorkFile, uint32_t savePeriod,
-                   bool saveKangaroo, bool saveKangarooByServer, double maxStep,
-                   int wtimeout, int port, int ntimeout, string serverIp,
-                   string outputFile, bool splitWorkfile) {
+Kangaroo::Kangaroo(Secp256K1 *secp,int32_t initDPSize,string &workFile,string &iWorkFile,uint32_t savePeriod,bool saveKangaroo,bool saveKangarooByServer,
+                   double maxStep,int wtimeout,int port,int ntimeout,string serverIp,string outputFile,bool splitWorkfile) {
+
   this->secp = secp;
   this->initDPSize = initDPSize;
-  this->useGpu = useGpu;
   this->offsetCount = 0;
   this->offsetTime = 0.0;
   this->workFile = workFile;
@@ -54,23 +49,24 @@ Kangaroo::Kangaroo(Secp256K1 *secp, int32_t initDPSize, bool useGpu,
 
   CPU_GRP_SIZE = 1024;
 
-  // Init mutex
   pthread_mutex_init(&ghMutex, NULL);
   pthread_mutex_init(&saveMutex, NULL);
-  signal(SIGPIPE, SIG_IGN);
+  signal(SIGFPE, SIG_IGN);
+
 }
 
 // ----------------------------------------------------------------------------
 
 bool Kangaroo::ParseConfigFile(std::string &fileName) {
+
   // In client mode, config come from the server
-  if (clientMode) return true;
+  if(clientMode)
+    return true;
 
   // Check file
-  FILE *fp = fopen(fileName.c_str(), "rb");
-  if (fp == NULL) {
-    ::printf("[+] Error: Cannot open %s %s\n", fileName.c_str(),
-             strerror(errno));
+  FILE *fp = fopen(fileName.c_str(),"rb");
+  if(fp == NULL) {
+    ::printf("Error: Cannot open %s %s\n",fileName.c_str(),strerror(errno));
     return false;
   }
   fclose(fp);
@@ -80,204 +76,221 @@ bool Kangaroo::ParseConfigFile(std::string &fileName) {
   int nbLine = 0;
   string line;
   ifstream inFile(fileName);
-  while (getline(inFile, line)) {
+  while(getline(inFile,line)) {
+
     // Remove ending \r\n
     int l = (int)line.length() - 1;
-    while (l >= 0 && isspace(line.at(l))) {
+    while(l >= 0 && isspace(line.at(l))) {
       line.pop_back();
       l--;
     }
 
-    if (line.length() > 0) {
+    if(line.length() > 0) {
       lines.push_back(line);
       nbLine++;
     }
+
   }
 
-  if (lines.size() < 3) {
-    ::printf("[+] Error: %s not enough arguments\n", fileName.c_str());
+  if(lines.size()<3) {
+    ::printf("Error: %s not enough arguments\n",fileName.c_str());
     return false;
   }
 
   rangeStart.SetBase16((char *)lines[0].c_str());
   rangeEnd.SetBase16((char *)lines[1].c_str());
-  for (int i = 2; i < (int)lines.size(); i++) {
+  for(int i=2;i<(int)lines.size();i++) {
+    
     Point p;
     bool isCompressed;
-    if (!secp->ParsePublicKeyHex(lines[i], p, isCompressed)) {
-      ::printf("[+] %s, error line %d: %s\n", fileName.c_str(), i,
-               lines[i].c_str());
+    if( !secp->ParsePublicKeyHex(lines[i],p,isCompressed) ) {
+      ::printf("%s, error line %d: %s\n",fileName.c_str(),i,lines[i].c_str());
       return false;
     }
     keysToSearch.push_back(p);
+
   }
 
-  ::printf("[+] Start:%s\n", rangeStart.GetBase16().c_str());
-  ::printf("[+] Stop :%s\n", rangeEnd.GetBase16().c_str());
-  ::printf("[+] Keys :%d\n", (int)keysToSearch.size());
+  ::printf("Start:%s\n",rangeStart.GetBase16().c_str());
+  ::printf("Stop :%s\n",rangeEnd.GetBase16().c_str());
+  ::printf("Keys :%d\n",(int)keysToSearch.size());
 
   return true;
+
 }
 
 // ----------------------------------------------------------------------------
 
-bool Kangaroo::IsDP(Int *x) {
-  return ((x->bits64[3] & dMask.i64[3]) == 0) &&
-         ((x->bits64[2] & dMask.i64[2]) == 0) &&
-         ((x->bits64[1] & dMask.i64[1]) == 0) &&
-         ((x->bits64[0] & dMask.i64[0]) == 0);
+bool Kangaroo::IsDP(uint64_t x) {
+
+  return (x & dMask) == 0;
+
 }
 
 void Kangaroo::SetDP(int size) {
+
   // Mask for distinguised point
   dpSize = size;
-  dMask.i64[0] = 0;
-  dMask.i64[1] = 0;
-  dMask.i64[2] = 0;
-  dMask.i64[3] = 0;
-  if (dpSize > 0) {
-    if (dpSize > 256) dpSize = 256;
-    for (int i = 0; i < size; i += 64) {
-      int end = (i + 64 > size) ? (size - 1) % 64 : 63;
-      uint64_t mask = ((1ULL << end) - 1) << 1 | 1ULL;
-      dMask.i64[(int)(i / 64)] = mask;
-    }
-  }
-
-  ::printf("[+] DP size: %d [0x%" PRIx64 "%" PRIx64 "%" PRIx64 "%" PRIx64 "]\n",
-           dpSize, dMask.i64[3], dMask.i64[2], dMask.i64[1], dMask.i64[0]);
-}
-
-// ----------------------------------------------------------------------------
-
-bool Kangaroo::Output(Int *pk, char sInfo, int sType) {
-  FILE *f = stdout;
-  bool needToClose = false;
-
-  if (outputFile.length() > 0) {
-    f = fopen(outputFile.c_str(), "a");
-    if (f == NULL) {
-      printf("[+] Cannot open %s for writing\n", outputFile.c_str());
-      f = stdout;
-    } else {
-      needToClose = true;
-    }
-  }
-
-  if (!needToClose) ::printf("\n");
-
-  Point PR = secp->ComputePublicKey(pk);
-
-  ::fprintf(f, "Key#%2d [%d%c]Pub: 0x%s \n", keyIdx, sType, sInfo,
-            secp->GetPublicKeyHex(true, keysToSearch[keyIdx]).c_str());
-  if (PR.equals(keysToSearch[keyIdx])) {
-    ::fprintf(f, "Priv: 0x%s \n", pk->GetBase16().c_str());
+  if(dpSize == 0) {
+    dMask = 0;
   } else {
-    ::fprintf(f, "Failed !\n");
-    if (needToClose) fclose(f);
-    return false;
+    if(dpSize > 64) dpSize = 64;
+    dMask = (1ULL << (64 - dpSize)) - 1;
+    dMask = ~dMask;
   }
 
-  if (needToClose) fclose(f);
+  ::printf("DP size: %d [0x%" PRIx64 "]\n",dpSize,dMask);
+}
 
-  return true;
+// ----------------------------------------------------------------------------
+bool Kangaroo::Output(Int* pk, char sInfo, int sType) {
+    FILE* f = stdout;
+    bool needToClose = false;
+
+    if (!outputFile.empty()) {
+        f = fopen(outputFile.c_str(), "a");
+        if (f == nullptr) {
+            std::cerr << "Cannot open " << outputFile << " for writing\n";
+            f = stdout;
+        } else {
+            needToClose = true;
+        }
+    }
+
+    if (!needToClose) {
+        std::printf("\n");
+    }
+
+    Point PR = secp->ComputePublicKey(pk);
+
+    if (PR.equals(keysToSearch[keyIdx])) {
+        std::fprintf(f, "Key#%2d [%d%c]Pub:  0x%s \n", keyIdx, sType, sInfo, secp->GetPublicKeyHex(true, keysToSearch[keyIdx]).c_str());
+        std::fprintf(f, "       Priv: 0x%s \n", pk->GetBase16().c_str());
+    } else {
+        if (needToClose) {
+            fclose(f);
+        }
+        return false;
+    }
+
+    if (needToClose) {
+        fclose(f);
+    }
+
+    return true;
 }
 
 // ----------------------------------------------------------------------------
 
-bool Kangaroo::CheckKey(Int d1, Int d2, uint8_t type) {
+bool  Kangaroo::CheckKey(Int d1,Int d2,uint8_t type) {
+
   // Resolve equivalence collision
 
-  if (type & 0x1) d1.ModNegK1order();
-  if (type & 0x2) d2.ModNegK1order();
+  if(type & 0x1)
+    d1.ModNegK1order();
+  if(type & 0x2)
+    d2.ModNegK1order();
 
   Int pk(&d1);
   pk.ModAddK1order(&d2);
 
   Point P = secp->ComputePublicKey(&pk);
 
-  if (P.equals(keyToSearch)) {
-    pk.ModAddK1order(&rangeStart);
-    return Output(&pk, 'N', type);
+  if(P.equals(keyToSearch)) {
+    pk.ModAddK1order(&rangeStart);    
+    return Output(&pk,'N',type);
   }
 
-  if (P.equals(keyToSearchNeg)) {
-    // Key solved
-    pk.ModNegK1order();
+  if(P.equals(keyToSearchNeg)) {
     pk.ModAddK1order(&rangeStart);
-    return Output(&pk, 'S', type);
+    return Output(&pk,'S',type);
   }
 
   return false;
+
 }
 
-bool Kangaroo::CollisionCheck(Int *d1, uint32_t type1, Int *d2,
-                              uint32_t type2) {
-  if (type1 == type2) {
+bool Kangaroo::CollisionCheck(Int* d1,uint32_t type1,Int* d2,uint32_t type2) {
+
+
+  if(type1 == type2) {
+
     // Collision inside the same herd
     return false;
 
   } else {
+
     Int Td;
     Int Wd;
 
-    if (type1 == TAME) {
+    if(type1 == TAME) {
       Td.Set(d1);
       Wd.Set(d2);
-    } else {
+    }  else {
       Td.Set(d2);
       Wd.Set(d1);
     }
 
-    endOfSearch = CheckKey(Td, Wd, 0) || CheckKey(Td, Wd, 1) ||
-                  CheckKey(Td, Wd, 2) || CheckKey(Td, Wd, 3);
-    // TODO we can literally attack any point around Td+Wd, but which???
-    if (!endOfSearch) {
+    endOfSearch = CheckKey(Td,Wd,0) || CheckKey(Td,Wd,1) || CheckKey(Td,Wd,2) || CheckKey(Td,Wd,3);
+
+    if(!endOfSearch) {
+
       // Should not happen, reset the kangaroo
-      /*
-      ::printf("\n[+]  Unexpected wrong collision, reset kangaroo !\n");
+      ::printf("\n Unexpected wrong collision, reset kangaroo !\n");
       if((int64_t)(Td.bits64[3])<0) {
         Td.ModNegK1order();
-        ::printf("[+] Found: Td-%s\n",Td.GetBase16().c_str());
+        ::printf("Found: Td-%s\n",Td.GetBase16().c_str());
       } else {
-        ::printf("[+] Found: Td %s\n",Td.GetBase16().c_str());
+        ::printf("Found: Td %s\n",Td.GetBase16().c_str());
       }
       if((int64_t)(Wd.bits64[3])<0) {
         Wd.ModNegK1order();
-        ::printf("[+] Found: Wd-%s\n",Wd.GetBase16().c_str());
+        ::printf("Found: Wd-%s\n",Wd.GetBase16().c_str());
       } else {
-        ::printf("[+] Found: Wd %s\n",Wd.GetBase16().c_str());
+        ::printf("Found: Wd %s\n",Wd.GetBase16().c_str());
       }
-      */
       return false;
+
     }
+
   }
 
   return true;
+
 }
 
 // ----------------------------------------------------------------------------
 
-bool Kangaroo::AddToTable(Int *pos, Int *dist, uint32_t kType) {
-  int addStatus = hashTable.Add(pos, dist, kType);
-  if (addStatus == ADD_COLLISION)
-    return CollisionCheck(&hashTable.kDist, hashTable.kType, dist, kType);
+bool Kangaroo::AddToTable(Int *pos,Int *dist,uint32_t kType) {
+
+  int addStatus = hashTable.Add(pos,dist,kType);
+  if(addStatus== ADD_COLLISION)
+    return CollisionCheck(&hashTable.kDist,hashTable.kType,dist,kType);
 
   return addStatus == ADD_OK;
+
 }
 
-bool Kangaroo::AddToTable(int256_t *x, int256_t *d, uint32_t kType) {
-  int addStatus = hashTable.Add(x, d, kType);
-  if (addStatus == ADD_COLLISION) {
+bool Kangaroo::AddToTable(uint64_t h,int128_t *x,int128_t *d) {
+
+  int addStatus = hashTable.Add(h,x,d);
+  if(addStatus== ADD_COLLISION) {
+
     Int dist;
-    HashTable::toInt(d, &dist);
-    return CollisionCheck(&hashTable.kDist, hashTable.kType, &dist, kType);
+    uint32_t kType;
+    HashTable::CalcDistAndType(*d,&dist,&kType);
+    return CollisionCheck(&hashTable.kDist,hashTable.kType,&dist,kType);
+
   }
 
   return addStatus == ADD_OK;
+
 }
 
-// ----------------------------------------------------------------------------
+// Inline function for checking if a value is a DP
+inline bool IsDP(const uint64_t value) {
+    return (value & 0x01) == 0;
+}
 void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     vector<ITEM> dps;
     int thId = ph->threadId;
@@ -318,7 +331,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             p2ys[g] = &ph->py[g];
             distances[g] = &jumpDistance[jmps[g]];
             dx[g].ModSub(p2xs[g], p1xs[g]);
-            isDPs[g] = IsDP(&ph->px[g]);
+            isDPs[g] = IsDP(ph->px[g].bits64[3]);
         }
         grp.Set(dx);
         grp.ModInv();
@@ -354,7 +367,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             if (now - lastSent > SEND_PERIOD) {
                 LOCK(ghMutex);
                 // Send to server
-                SendToServer(dps, ph->threadId, 0xFFFF);
+                SendToServer(dps, ph->threadId);
                 UNLOCK(ghMutex);
                 lastSent = now;
             }
@@ -392,127 +405,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
 
     ph->isRunning = false;
 }
-void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
-    double lastSent = 0;
-    int thId = ph->threadId;
-
-#ifdef WITHGPU
-
-    vector<ITEM> dps;
-    vector<ITEM> gpuFound;
-    GPUEngine *gpu = new GPUEngine(ph->gridSizeX, ph->gridSizeY, ph->gpuId, 65536 * 2);
-
-    if (keyIdx == 0) {
-        ::printf("[+] GPU: %s (%.1f MB used)\n", gpu->deviceName.c_str(), gpu->GetMemory() / 1048576.0);
-    }
-
-    double t0 = Timer::get_tick();
-
-    if (ph->px == nullptr) {
-        if (keyIdx == 0) {
-            ::printf("[+] SolveKeyGPU Thread GPU#%d: creating kangaroos...\n", ph->gpuId);
-        }
-        uint64_t nbThread = gpu->GetNbThread();
-        ph->px = new Int[ph->nbKangaroo];
-        ph->py = new Int[ph->nbKangaroo];
-        ph->distance = new Int[ph->nbKangaroo];
-
-        for (uint64_t i = 0; i < nbThread; i++) {
-            CreateHerd(GPU_GRP_SIZE, &(ph->px[i * GPU_GRP_SIZE]), &(ph->py[i * GPU_GRP_SIZE]), &(ph->distance[i * GPU_GRP_SIZE]), TAME);
-        }
-    }
-
-    gpu->SetWildOffset(&rangeWidthDiv2);
-    Int dmaskInt;
-    HashTable::toInt(&dMask, &dmaskInt);
-    gpu->SetParams(&dmaskInt, jumpDistance, jumpPointx, jumpPointy);
-    gpu->SetKangaroos(ph->px, ph->py, ph->distance);
-
-    if (workFile.empty() || !saveKangaroo) {
-        // No need to get back kangaroo, free memory
-        safe_delete_array(ph->px);
-        safe_delete_array(ph->py);
-        safe_delete_array(ph->distance);
-    }
-
-    gpu->callKernel();
-
-    double t1 = Timer::get_tick();
-    if (keyIdx == 0) {
-        ::printf("[+] SolveKeyGPU Thread GPU#%d: 2^%.2f kangaroos [%.1fs]\n", ph->gpuId, log2((double)ph->nbKangaroo), (t1 - t0));
-    }
-
-    ph->hasStarted = true;
-
-    if (clientMode) {
-        while (!endOfSearch) {
-            gpu->Launch(gpuFound);
-            counters[thId] += ph->nbKangaroo * NB_RUN;
-
-            for (int i = 0; i < (int)gpuFound.size(); i++) {
-                dps.push_back(gpuFound[i]);
-            }
-
-            double now = Timer::get_tick();
-            if (now - lastSent > SEND_PERIOD) {
-                LOCK(ghMutex);
-                SendToServer(dps, ph->threadId, ph->gpuId);
-                UNLOCK(ghMutex);
-                lastSent = now;
-            }
-
-            // Handle save request if needed
-            if (saveRequest && !endOfSearch) {
-                if (saveKangaroo) gpu->GetKangaroos(ph->px, ph->py, ph->distance);
-                ph->isWaiting = true;
-                LOCK(saveMutex);
-                ph->isWaiting = false;
-                UNLOCK(saveMutex);
-            }
-        }
-    } else {
-        while (!endOfSearch) {
-            gpu->Launch(gpuFound);
-            counters[thId] += ph->nbKangaroo * NB_RUN;
-
-            if (!gpuFound.empty()) {
-                LOCK(ghMutex);
-                for (int g = 0; !endOfSearch && g < gpuFound.size(); g++) {
-                    uint32_t kType = (uint32_t)(gpuFound[g].kIdx % 2);
-
-                    if (!AddToTable(&gpuFound[g].x, &gpuFound[g].d, kType)) {
-                        // Collision inside the same herd, reset the kangaroo
-                        Int px, py, d;
-                        CreateHerd(1, &px, &py, &d, kType, false);
-                        gpu->SetKangaroo(gpuFound[g].kIdx, &px, &py, &d);
-                        collisionInSameHerd++;
-                    }
-                }
-                UNLOCK(ghMutex);
-            }
-
-            // Handle save request if needed
-            if (saveRequest && !endOfSearch) {
-                if (saveKangaroo) gpu->GetKangaroos(ph->px, ph->py, ph->distance);
-                ph->isWaiting = true;
-                LOCK(saveMutex);
-                ph->isWaiting = false;
-                UNLOCK(saveMutex);
-            }
-        }
-    }
-
-    safe_delete_array(ph->px);
-    safe_delete_array(ph->py);
-    safe_delete_array(ph->distance);
-    delete gpu;
-
-#else
-    ph->hasStarted = true;
-#endif
-
-    ph->isRunning = false;
-}
 
 // ----------------------------------------------------------------------------
 
@@ -521,13 +413,6 @@ void *_SolveKeyCPU(void *lpParam) {
   p->obj->SolveKeyCPU(p);
   return 0;
 }
-
-void *_SolveKeyGPU(void *lpParam) {
-  TH_PARAM *p = (TH_PARAM *)lpParam;
-  p->obj->SolveKeyGPU(p);
-  return 0;
-}
-
 
 // ----------------------------------------------------------------------------
 void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstType, bool lock) {
@@ -576,17 +461,16 @@ void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstTyp
 // ----------------------------------------------------------------------------
 
 void Kangaroo::CreateJumpTable() {
+
   int jumpBit = rangePower / 2 + 1;
 
-  if (jumpBit > 256) jumpBit = 256;
+
+  if(jumpBit > 128) jumpBit = 128;
   int maxRetry = 100;
   bool ok = false;
   double distAvg;
-  double maxAvg = pow(2.0, (double)jumpBit - 0.95);
-  double minAvg = pow(2.0, (double)jumpBit - 1.05);
-  //::printf("Jump Avg distance min: 2^%.2f\n",log2(minAvg));
-  //::printf("Jump Avg distance max: 2^%.2f\n",log2(maxAvg));
-
+  double maxAvg = pow(2.0,(double)jumpBit - 0.95);
+  double minAvg = pow(2.0,(double)jumpBit - 1.05);
   // Kangaroo jumps
   // Constant seed for compatibilty of workfiles
   rseed(0x600DCAFE);
@@ -594,35 +478,37 @@ void Kangaroo::CreateJumpTable() {
 
   // Positive only
   // When using symmetry, the sign is switched by the symmetry class switch
-  while (!ok && maxRetry > 0) {
+  while(!ok && maxRetry>0 ) {
     Int totalDist;
     totalDist.SetInt32(0);
-    for (int i = 0; i < NB_JUMP; ++i) {
+    for(int i = 0; i < NB_JUMP; ++i) {
       jumpDistance[i].Rand(jumpBit);
-      if (jumpDistance[i].IsZero()) jumpDistance[i].SetInt32(1);
+      if(jumpDistance[i].IsZero())
+        jumpDistance[i].SetInt32(1);
       totalDist.Add(&jumpDistance[i]);
-    }
+  }
     distAvg = totalDist.ToDouble() / (double)(NB_JUMP);
-    ok = distAvg > minAvg && distAvg < maxAvg;
+    ok = distAvg>minAvg && distAvg<maxAvg;
     maxRetry--;
   }
 
-  for (int i = 0; i < NB_JUMP; ++i) {
+  for(int i = 0; i < NB_JUMP; ++i) {
     Point J = secp->ComputePublicKey(&jumpDistance[i]);
     jumpPointx[i].Set(&J.x);
     jumpPointy[i].Set(&J.y);
   }
 
-  ::printf("[+] Jump Avg distance: 2^%.2f\n", log2(distAvg));
+  ::printf("Jump Avg distance: 2^%.2f\n",log2(distAvg));
 
   unsigned long seed = Timer::getSeed32();
   rseed(seed);
+
 }
 
 // ----------------------------------------------------------------------------
 
-void Kangaroo::ComputeExpected(double dp, double *op, double *ram,
-                               double *overHead) {
+void Kangaroo::ComputeExpected(double dp,double *op,double *ram,double *overHead) {
+
   // Compute expected number of operation and memory
 
   double gainS = 1.0;
@@ -631,10 +517,10 @@ void Kangaroo::ComputeExpected(double dp, double *op, double *ram,
   double k = (double)totalRW;
 
   // Range size
-  double N = pow(2.0, (double)rangePower);
+  double N = pow(2.0,(double)rangePower);
 
   // theta
-  double theta = pow(2.0, dp);
+  double theta = pow(2.0,dp);
 
   // Z0
   double Z0 = (2.0 * (2.0 - sqrt(2.0)) * gainS) * sqrt(M_PI);
@@ -643,185 +529,141 @@ void Kangaroo::ComputeExpected(double dp, double *op, double *ram,
   double avgDP0 = Z0 * sqrt(N);
 
   // DP Overhead
-  *op = Z0 * pow(N * (k * theta + sqrt(N)), 1.0 / 3.0);
+  *op = Z0 * pow(N * (k * theta + sqrt(N)),1.0 / 3.0);
 
-  *ram = (double)sizeof(HASH_ENTRY) * (double)HASH_SIZE +  // Table
-         (double)sizeof(ENTRY *) *
-             (double)(HASH_SIZE * 4) +  // Allocation overhead
-         (double)(sizeof(ENTRY) + sizeof(ENTRY *)) * (*op / theta);  // Entries
+  *ram = (double)sizeof(HASH_ENTRY) * (double)HASH_SIZE + // Table
+         (double)sizeof(ENTRY *) * (double)(HASH_SIZE * 4) + // Allocation overhead
+         (double)(sizeof(ENTRY) + sizeof(ENTRY *)) * (*op / theta); // Entries
 
-  *ram /= (1024.0 * 1024.0);
+  *ram /= (1024.0*1024.0);
 
-  if (overHead) *overHead = *op / avgDP0;
+  if(overHead)
+    *overHead = *op/avgDP0;
+
 }
 
 // ----------------------------------------------------------------------------
 
 void Kangaroo::InitRange() {
+
   rangeWidth.Set(&rangeEnd);
   rangeWidth.Sub(&rangeStart);
   rangePower = rangeWidth.GetBitLength();
-  ::printf("[+] Range width: 2^%d\n", rangePower);
+  ::printf("Range width: 2^%d\n",rangePower);
   rangeWidthDiv2.Set(&rangeWidth);
   rangeWidthDiv2.ShiftR(1);
   rangeWidthDiv4.Set(&rangeWidthDiv2);
   rangeWidthDiv4.ShiftR(1);
   rangeWidthDiv8.Set(&rangeWidthDiv4);
   rangeWidthDiv8.ShiftR(1);
+
 }
 
 void Kangaroo::InitSearchKey() {
+
   Int SP;
   SP.Set(&rangeStart);
-  if (!SP.IsZero()) {
+  if(!SP.IsZero()) {
     Point RS = secp->ComputePublicKey(&SP);
     RS.y.ModNeg();
-    keyToSearch = secp->AddDirect(keysToSearch[keyIdx], RS);
+    keyToSearch = secp->AddDirect(keysToSearch[keyIdx],RS);
   } else {
     keyToSearch = keysToSearch[keyIdx];
   }
   keyToSearchNeg = keyToSearch;
   keyToSearchNeg.y.ModNeg();
+
 }
 
-// ----------------------------------------------------------------------------
+void Kangaroo::Run(int nbThread) {
+    double t0 = Timer::get_tick();
 
-void Kangaroo::Run(int nbThread, std::vector<int> gpuId,
-                   std::vector<int> gridSize) {
-  double t0 = Timer::get_tick();
+    nbCPUThread = nbThread;
+    totalRW = 0;
 
-  nbCPUThread = nbThread;
-  nbGPUThread = (useGpu ? (int)gpuId.size() : 0);
-  totalRW = 0;
-
-#ifndef WITHGPU
-
-  if (nbGPUThread > 0) {
-    ::printf("GPU code not compiled, use -DWITHGPU when compiling.\n");
-    nbGPUThread = 0;
-  }
-
-#endif
-
-  uint64_t totalThread = (uint64_t)nbCPUThread + (uint64_t)nbGPUThread;
-  if (totalThread == 0) {
-    ::printf("No CPU or GPU thread, exiting.\n");
-    ::exit(0);
-  }
-
-  TH_PARAM *params = (TH_PARAM *)malloc(totalThread * sizeof(TH_PARAM));
-  THREAD_HANDLE *thHandles =
-      (THREAD_HANDLE *)malloc(totalThread * sizeof(THREAD_HANDLE));
-
-  memset(params, 0, totalThread * sizeof(TH_PARAM));
-  memset(counters, 0, sizeof(counters));
-  ::printf("[+] Number of CPU thread: %d\n", nbCPUThread);
-
-#ifdef WITHGPU
-
-  // Compute grid size
-  for (int i = 0; i < nbGPUThread; i++) {
-    int x = gridSize[2ULL * i];
-    int y = gridSize[2ULL * i + 1ULL];
-    if (!GPUEngine::GetGridSize(gpuId[i], &x, &y)) {
-      free(params);
-      free(thHandles);
-      return;
-    } else {
-      params[nbCPUThread + i].gridSizeX = x;
-      params[nbCPUThread + i].gridSizeY = y;
-    }
-    params[nbCPUThread + i].nbKangaroo = (uint64_t)GPU_GRP_SIZE * x * y;
-    totalRW += params[nbCPUThread + i].nbKangaroo;
-  }
-
-#endif
-
-  totalRW += nbCPUThread * (uint64_t)CPU_GRP_SIZE;
-
-  // Set starting parameters
-  if (clientMode) {
-    // Retrieve config from server
-    if (!GetConfigFromServer()) ::exit(0);
-    // Client save only kangaroos, force -ws
-    if (workFile.length() > 0) saveKangaroo = true;
-  }
-
-  InitRange();
-  CreateJumpTable();
-
-  ::printf("[+] Number of kangaroos: 2^%.2f\n", log2((double)totalRW));
-
-  if (!clientMode) {
-    // Compute suggested distinguished bits number for less than 5% overhead
-    // (see README)
-    double dpOverHead;
-    int suggestedDP = (int)((double)rangePower / 2.0 - log2((double)totalRW));
-    if (suggestedDP < 0) suggestedDP = 0;
-    ComputeExpected((double)suggestedDP, &expectedNbOp, &expectedMem,
-                    &dpOverHead);
-    while (dpOverHead > 1.05 && suggestedDP > 0) {
-      suggestedDP--;
-      ComputeExpected((double)suggestedDP, &expectedNbOp, &expectedMem,
-                      &dpOverHead);
+    uint64_t totalThread = (uint64_t)nbCPUThread;
+    if (totalThread == 0) {
+        ::printf("No CPU threads, exiting.\n");
+        ::exit(0);
     }
 
-    if (initDPSize < 0) initDPSize = suggestedDP;
+    TH_PARAM *params = (TH_PARAM *)malloc(totalThread * sizeof(TH_PARAM));
+    THREAD_HANDLE *thHandles = (THREAD_HANDLE *)malloc(totalThread * sizeof(THREAD_HANDLE));
 
-    ComputeExpected((double)initDPSize, &expectedNbOp, &expectedMem);
-    if (nbLoadedWalk == 0) ::printf("[+] Suggested DP: %d\n", suggestedDP);
-    ::printf("[+] Expected operations: 2^%.2f\n", log2(expectedNbOp));
-    ::printf("[+] Expected RAM: %.1fMB\n", expectedMem);
+    memset(params, 0, totalThread * sizeof(TH_PARAM));
+    memset(counters, 0, sizeof(counters));
+    ::printf("Number of CPU threads: %d\n", nbCPUThread);
 
-  } else {
-    keyIdx = 0;
-    InitSearchKey();
-  }
+    totalRW += nbCPUThread * (uint64_t)CPU_GRP_SIZE;
 
-  SetDP(initDPSize);
+    // Set starting parameters
+    if (clientMode) {
+        // Retrieve config from server
+        if (!GetConfigFromServer())
+            ::exit(0);
+        // Client save only kangaroos, force -ws
+        if (workFile.length() > 0)
+            saveKangaroo = true;
+    }
 
-  // Fetch kangaroos (if any)
-  FectchKangaroos(params);
+    InitRange();
+    CreateJumpTable();
 
-    for (keyIdx = 0; keyIdx < keysToSearch.size(); keyIdx++) {
-      InitSearchKey();
+    ::printf("Number of kangaroos: 2^%.2f\n", log2((double)totalRW));
 
-      endOfSearch = false;
-      collisionInSameHerd = 0;
+    if (!clientMode) {
+        // Compute suggested distinguished bits number for less than 5% overhead (see README)
+        double dpOverHead;
+        int suggestedDP = (int)((double)rangePower / 2.0 - log2((double)totalRW));
+        if (suggestedDP < 0)
+            suggestedDP = 0;
+        ComputeExpected((double)suggestedDP, &expectedNbOp, &expectedMem, &dpOverHead);
+        while (dpOverHead > 1.05 && suggestedDP > 0) {
+            suggestedDP--;
+            ComputeExpected((double)suggestedDP, &expectedNbOp, &expectedMem, &dpOverHead);
+        }
 
-      // Reset conters
-      memset(counters, 0, sizeof(counters));
+        if (initDPSize < 0)
+            initDPSize = suggestedDP;
 
-      // Lanch CPU threads
-      for (int i = 0; i < nbCPUThread; i++) {
-        params[i].threadId = i;
-        params[i].isRunning = true;
-        thHandles[i] = LaunchThread(_SolveKeyCPU, params + i);
-      }
+        ComputeExpected((double)initDPSize, &expectedNbOp, &expectedMem);
+        if (nbLoadedWalk == 0)
+            ::printf("Suggested DP: %d\n", suggestedDP);
+        ::printf("Expected operations: 2^%.2f\n", log2(expectedNbOp));
+        ::printf("Expected RAM: %.1fMB\n", expectedMem);
+    }
+    else {
+        keyIdx = 0;
+        InitSearchKey();
+    }
 
-#ifdef WITHGPU
+    SetDP(initDPSize);
 
-      // Launch GPU threads
-      for (int i = 0; i < nbGPUThread; i++) {
-        int id = nbCPUThread + i;
-        params[id].threadId = 0x80L + i;
-        params[id].isRunning = true;
-        params[id].gpuId = gpuId[i];
-        thHandles[id] = LaunchThread(_SolveKeyGPU, params + id);
-      }
+    // Fetch kangaroos (if any)
+    FectchKangaroos(params);
 
-#endif
+        for (keyIdx = 0; keyIdx < keysToSearch.size(); keyIdx++) {
+            InitSearchKey();
+            endOfSearch = false;
+            collisionInSameHerd = 0;
 
-      // Wait for end
-      Process(params, "MK/s");
-      JoinThreads(thHandles, nbCPUThread + nbGPUThread);
-      FreeHandles(thHandles, nbCPUThread + nbGPUThread);
-      hashTable.Reset();
+            // Reset counters
+            memset(counters, 0, sizeof(counters));
 
-  }
+            // Launch CPU threads
+            for (int i = 0; i < nbCPUThread; i++) {
+                params[i].threadId = i;
+                params[i].isRunning = true;
+                thHandles[i] = LaunchThread(_SolveKeyCPU, params + i);
+            }
 
-  double t1 = Timer::get_tick();
+            // Wait for end
+            Process(params, "MK/s");
+            JoinThreads(thHandles, nbCPUThread);
+            FreeHandles(thHandles, nbCPUThread);
+            hashTable.Reset();
+    }
 
-  ::printf("\n[+] Done: Total time %s \n",
-           GetTimeStr(t1 - t0 + offsetTime).c_str());
+    double t1 = Timer::get_tick();
+    ::printf("\nDone: Total time %s \n", GetTimeStr(t1 - t0 + offsetTime).c_str());
 }

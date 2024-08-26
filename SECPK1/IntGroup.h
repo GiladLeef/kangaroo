@@ -8,14 +8,14 @@ class IntGroup {
 
 public:
 
-  IntGroup(int size);
-  ~IntGroup();
-  void Set(Int *pts);
-  void ModInv();
+	IntGroup(int size);
+	~IntGroup();
+	void Set(Int *pts);
+	void ModInv();
 
 private:
 
-  Int *ints;
+	Int *ints;
   Int *subp;
   int size;
 

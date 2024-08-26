@@ -1,3 +1,5 @@
+#include <x86intrin.h>
+
 #include "Int.h"
 #include "IntGroup.h"
 #include <string.h>
@@ -9,6 +11,7 @@
 #define MIN(x,y) (((x)<(y))?(x):(y))
 
 Int _ONE((uint64_t)1);
+
 
 // ------------------------------------------------
 
@@ -38,14 +41,6 @@ Int::Int(uint64_t u64) {
 
 }
 
-void Int::Copy(Int *a)
-{
-  bits64[0] = a->bits64[0];
-  bits64[1] = a->bits64[1];
-  bits64[2] = a->bits64[2];
-  bits64[3] = a->bits64[3];
-  bits64[4] = a->bits64[4];
-}
 // ------------------------------------------------
 
 void Int::CLEAR() {
@@ -79,6 +74,7 @@ void Int::Add(Int *a) {
   c = _addcarry_u64(c, bits64[2], a->bits64[2], bits64 +2);
   c = _addcarry_u64(c, bits64[3], a->bits64[3], bits64 +3);
   c = _addcarry_u64(c, bits64[4], a->bits64[4], bits64 +4);
+
 }
 
 // ------------------------------------------------
@@ -88,8 +84,6 @@ void Int::Add(uint64_t a) {
 	unsigned char c = 0;
 	c = _addcarry_u64(c, bits64[0], a, bits64 + 0);
 	c = _addcarry_u64(c, bits64[1], 0, bits64 + 1);
-	if (!c)
-		return;
 	c = _addcarry_u64(c, bits64[2], 0, bits64 + 2);
 	c = _addcarry_u64(c, bits64[3], 0, bits64 + 3);
 	c = _addcarry_u64(c, bits64[4], 0, bits64 + 4);
@@ -100,8 +94,6 @@ void Int::AddOne() {
 
   unsigned char c = 0;
   c = _addcarry_u64(c, bits64[0],1, bits64 +0);
-  if (!c)
-	  return;
   c = _addcarry_u64(c, bits64[1],0, bits64 +1);
   c = _addcarry_u64(c, bits64[2],0, bits64 +2);
   c = _addcarry_u64(c, bits64[3],0, bits64 +3);
@@ -176,7 +168,6 @@ void Int::AddAndShift(Int* a,Int* b,uint64_t cH) {
   c = _addcarry_u64(c,b->bits64[2],a->bits64[2],bits64 + 1);
   c = _addcarry_u64(c,b->bits64[3],a->bits64[3],bits64 + 2);
   c = _addcarry_u64(c,b->bits64[4],a->bits64[4],bits64 + 3);
-
   bits64[NB64BLOCK - 1] = c + cH;
 
 }
@@ -295,9 +286,7 @@ bool Int::IsOne() {
 }
 
 bool Int::IsZero() {
-
   return (bits64[4] | bits64[3] | bits64[2] | bits64[1] | bits64[0]) == 0;
-
 }
 
 
@@ -390,6 +379,7 @@ void Int::Sub(Int *a,Int *b) {
   c = _subborrow_u64(c, a->bits64[2], b->bits64[2], bits64 + 2);
   c = _subborrow_u64(c, a->bits64[3], b->bits64[3], bits64 + 3);
   c = _subborrow_u64(c, a->bits64[4], b->bits64[4], bits64 + 4);
+
 }
 
 void Int::Sub(uint64_t a) {
@@ -397,8 +387,6 @@ void Int::Sub(uint64_t a) {
   unsigned char c = 0;
   c = _subborrow_u64(c, bits64[0], a, bits64 + 0);
   c = _subborrow_u64(c, bits64[1], 0, bits64 + 1);
-  if (!c)
-	  return;
   c = _subborrow_u64(c, bits64[2], 0, bits64 + 2);
   c = _subborrow_u64(c, bits64[3], 0, bits64 + 3);
   c = _subborrow_u64(c, bits64[4], 0, bits64 + 4);
@@ -409,8 +397,6 @@ void Int::SubOne() {
 
   unsigned char c = 0;
   c = _subborrow_u64(c, bits64[0], 1, bits64 + 0);
-  if (!c)
-	  return;
   c = _subborrow_u64(c, bits64[1], 0, bits64 + 1);
   c = _subborrow_u64(c, bits64[2], 0, bits64 + 2);
   c = _subborrow_u64(c, bits64[3], 0, bits64 + 3);
@@ -461,6 +447,7 @@ void Int::Neg() {
 	c = _subborrow_u64(c, 0, bits64[2], bits64 + 2);
 	c = _subborrow_u64(c, 0, bits64[3], bits64 + 3);
 	c = _subborrow_u64(c, 0, bits64[4], bits64 + 4);
+
 }
 
 // ------------------------------------------------
@@ -631,6 +618,7 @@ uint64_t Int::IMult(Int *a, int64_t b) {
     c = _subborrow_u64(c,0,a->bits64[2],bits64 + 2);
     c = _subborrow_u64(c,0,a->bits64[3],bits64 + 3);
     c = _subborrow_u64(c,0,a->bits64[4],bits64 + 4);
+
   	b = -b;
 
   } else {
