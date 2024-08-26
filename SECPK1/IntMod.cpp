@@ -565,26 +565,14 @@ void Int::ModMulK1(Int *a, Int *b) {
 }
 
 void Int::ModMulK1(Int *a) {
-
-#ifndef WIN64
-#if (__GNUC__ > 7) || (__GNUC__ == 7 && (__GNUC_MINOR__ > 2))
+  
   unsigned char c;
-#else
-  #warning "GCC lass than 7.3 detected, upgrade gcc to get best perfromance"
-  volatile unsigned char c;
-#endif
-#else
-  unsigned char c;
-#endif
-
   uint64_t ah, al;
   uint64_t t[NB64BLOCK];
   uint64_t r512[8];
   r512[5] = 0;
   r512[6] = 0;
   r512[7] = 0;
-
-
 
   // 256*256 multiplier
   imm_umul(a->bits64, bits64[0], r512);
