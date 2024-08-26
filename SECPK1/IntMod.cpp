@@ -194,6 +194,7 @@ void Int::ModInv() {
 
         MatrixVecMul(&r, &s, uu, uv, vu, vv, &carryR, &carryS);
 
+        // Optimize modular reduction using Montgomery multiplication
         uint64_t r0 = (r.bits64[0] * MM64) & MSK62;
         uint64_t s0 = (s.bits64[0] * MM64) & MSK62;
         r0_P.Mult(&_P, r0);
@@ -226,7 +227,6 @@ void Int::ModInv() {
 
     Set(&r);
 }
-
 
 // ------------------------------------------------
 
@@ -293,82 +293,78 @@ bool Int::HasSqrt() {
 }
 
 // ------------------------------------------------
-
 void Int::ModSqrt() {
-
-  if (_P.IsEven()) {
-    CLEAR();
-    return;
-  }
-
-  if (!HasSqrt()) {
-    CLEAR();
-    return;
-  }
-
-  if ((_P.bits64[0] & 3) == 3) {
-
-    Int e(&_P);
-    e.AddOne();
-    e.ShiftR(2);
-    ModExp(&e);
-
-  } else if ((_P.bits64[0] & 3) == 1) {
-
-    int nbBit = _P.GetBitLength();
-
-    // Tonelli Shanks
-    uint64_t e=0;
-    Int S(&_P);
-    S.SubOne();
-    while (S.IsEven()) {
-      S.ShiftR(1);
-      e++;
+    if (_P.IsEven()) {
+        CLEAR();
+        return;
     }
 
-    // Search smalest non-qresidue of P
-    Int q((uint64_t)1);
-    do {
-      q.AddOne();
-    }  while (q.HasSqrt());
-
-    Int c(&q);
-    c.ModExp(&S);
-
-    Int t(this);
-    t.ModExp(&S);
-
-    Int r(this);
-    Int ex(&S);
-    ex.AddOne();
-    ex.ShiftR(1);
-    r.ModExp(&ex);
-
-    uint64_t M = e;
-    while (!t.IsOne()) {
-
-      Int t2(&t);
-      uint64_t i=0;
-      while (!t2.IsOne()) {
-        t2.ModSquare(&t2);
-        i++;
-      }
-
-      Int b(&c);
-      for(uint64_t j=0;j<M-i-1;j++)
-        b.ModSquare(&b);
-      M=i;
-      c.ModSquare(&b);
-      t.ModMul(&t,&c);
-      r.ModMul(&r,&b);
-
+    if (!HasSqrt()) {
+        CLEAR();
+        return;
     }
 
-    Set(&r);
+    if ((_P.bits64[0] & 3) == 3) {
+        // Case p ≡ 3 (mod 4)
+        Int e(&_P);
+        e.AddOne();
+        e.ShiftR(2);
+        ModExp(&e);
+    } else if ((_P.bits64[0] & 3) == 1) {
+        // Case p ≡ 1 (mod 4)
+        Int S(&_P);
+        S.SubOne();
 
-  }
+        // Compute the highest power of 2 dividing p-1
+        uint64_t e = 0;
+        while (S.IsEven()) {
+            S.ShiftR(1);
+            e++;
+        }
 
+        // Find a quadratic non-residue
+        Int q((uint64_t)1);
+        do {
+            q.AddOne();
+        } while (q.HasSqrt());
+
+        Int c(&q);
+        c.ModExp(&S);
+
+        // Compute t = this^S
+        Int t(this);
+        t.ModExp(&S);
+
+        // Compute r = this^((S+1)/2)
+        Int r(this);
+        Int ex(&S);
+        ex.AddOne();
+        ex.ShiftR(1);
+        r.ModExp(&ex);
+
+        uint64_t M = e;
+        while (!t.IsOne()) {
+            Int t2(&t);
+            uint64_t i = 0;
+            while (!t2.IsOne()) {
+                t2.ModSquare(&t2);
+                i++;
+            }
+
+            Int b(&c);
+            for (uint64_t j = 0; j < M - i - 1; j++) {
+                b.ModSquare(&b);
+            }
+            M = i;
+            c.ModSquare(&b);
+            t.ModMul(&t, &c);
+            r.ModMul(&r, &b);
+        }
+
+        Set(&r);
+    }
 }
+
 
 // ------------------------------------------------
 
