@@ -160,88 +160,73 @@ void Int::DivStep62(Int* u, Int* v, int64_t* eta, int* pos, int64_t* uu, int64_t
 // ------------------------------------------------
 
 uint64_t totalCount;
-
 void Int::ModInv() {
+    // Compute modular inverse of this mod _P
+    Int u(&_P);
+    Int v(this);
+    Int r((int64_t)0);
+    Int s((int64_t)1);
 
-  // Compute modular inverse of this mop _P
-  // 0 <= this < _P  , _P must be odd
-  // Return 0 if no inverse
-  Int u(&_P);
-  Int v(this);
-  Int r((int64_t)0);
-  Int s((int64_t)1);
+    Int r0_P;
+    Int s0_P;
 
-  // Delayed right shift 62bits
-  Int r0_P;
-  Int s0_P;
+    int64_t eta = -1;
+    int64_t uu, uv, vu, vv;
+    uint64_t carryS, carryR;
+    int pos = NB64BLOCK - 1;
+    while (pos >= 1 && (u.bits64[pos] | v.bits64[pos]) == 0) pos--;
 
-  int64_t  eta = -1;
-  int64_t uu,uv,vu,vv;
-  uint64_t carryS,carryR;
-  int pos = NB64BLOCK - 1;
-  while(pos >= 1 && (u.bits64[pos] | v.bits64[pos]) == 0) pos--;
+    while (!v.IsZero()) {
+        DivStep62(&u, &v, &eta, &pos, &uu, &uv, &vu, &vv);
 
-  while (!v.IsZero()) {
+        MatrixVecMul(&u, &v, uu, uv, vu, vv);
 
-    DivStep62(&u,&v,&eta,&pos,&uu,&uv,&vu,&vv);
+        if (u.IsNegative()) {
+            u.Neg();
+            uu = -uu;
+            uv = -uv;
+        }
+        if (v.IsNegative()) {
+            v.Neg();
+            vu = -vu;
+            vv = -vv;
+        }
 
-    // Now update BigInt variables
+        MatrixVecMul(&r, &s, uu, uv, vu, vv, &carryR, &carryS);
 
-    MatrixVecMul(&u,&v,uu,uv,vu,vv);
+        uint64_t r0 = (r.bits64[0] * MM64) & MSK62;
+        uint64_t s0 = (s.bits64[0] * MM64) & MSK62;
+        r0_P.Mult(&_P, r0);
+        s0_P.Mult(&_P, s0);
+        carryR = r.AddCh(&r0_P, carryR);
+        carryS = s.AddCh(&s0_P, carryS);
 
-    // Make u,v positive
-    // Required only for Pornin's method
-    if(u.IsNegative()) {
-      u.Neg();
-      uu = -uu;
-      uv = -uv;
+        shiftR(62, u.bits64);
+        shiftR(62, v.bits64);
+        shiftR(62, r.bits64, carryR);
+        shiftR(62, s.bits64, carryS);
+
+        totalCount++;
     }
-    if(v.IsNegative()) {
-      v.Neg();
-      vu = -vu;
-      vv = -vv;
+
+    if (u.IsNegative()) {
+        u.Neg();
+        r.Neg();
     }
 
-    MatrixVecMul(&r,&s,uu,uv,vu,vv,&carryR,&carryS);
+    if (!u.IsOne()) {
+        CLEAR();
+        return;
+    }
 
-    // Compute multiple of P to add to s and r to make them multiple of 2^62
-    uint64_t r0 = (r.bits64[0] * MM64) & MSK62;
-    uint64_t s0 = (s.bits64[0] * MM64) & MSK62;
-    r0_P.Mult(&_P,r0);
-    s0_P.Mult(&_P,s0);
-    carryR = r.AddCh(&r0_P,carryR);
-    carryS = s.AddCh(&s0_P,carryS);
+    while (r.IsNegative())
+        r.Add(&_P);
+    while (r.IsGreaterOrEqual(&_P))
+        r.Sub(&_P);
 
-    // Right shift all variables by 62bits
-    shiftR(62, u.bits64);
-    shiftR(62, v.bits64);
-    shiftR(62, r.bits64, carryR);
-    shiftR(62, s.bits64, carryS);
-    
-    totalCount++;
-
-  }
-  
-  // u ends with +/-1
-  if(u.IsNegative()) {
-    u.Neg();
-    r.Neg();
-  }
-
-  if (!u.IsOne()) {
-    // No inverse
-    CLEAR();
-    return;
-  }
-
-  while(r.IsNegative())
-    r.Add(&_P);
-  while(r.IsGreaterOrEqual(&_P))
-    r.Sub(&_P);
-
-  Set(&r);
-
+    Set(&r);
 }
+
 
 // ------------------------------------------------
 
