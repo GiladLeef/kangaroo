@@ -321,48 +321,49 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
 
     ph->hasStarted = true;
 
-    while (!endOfSearch) {
-        // Calculate jumps and initialize pointers
-        for (int g = 0; g < CPU_GRP_SIZE; g++) {
-            jmps[g] = ph->px[g].bits64[0] % NB_JUMP;
-            p1xs[g] = &jumpPointx[jmps[g]];
-            p1ys[g] = &jumpPointy[jmps[g]];
-            p2xs[g] = &ph->px[g];
-            p2ys[g] = &ph->py[g];
-            distances[g] = &jumpDistance[jmps[g]];
-            dx[g].ModSub(p2xs[g], p1xs[g]);
-            isDPs[g] = IsDP(ph->px[g].bits64[3]);
-        }
-        grp.Set(dx);
-        grp.ModInv();
-
-        for (int g = 0; g < CPU_GRP_SIZE; g++) {
-            dy.ModSub(p2ys[g], p1ys[g]);
-            _s.ModMulK1(&dy, &dx[g]);
-            _p.ModSquareK1(&_s);
-            rx.ModSub(&_p, p1xs[g]);
-            rx.ModSub(p2xs[g]);
-            ry.ModSub(p2xs[g], &rx);
-            ry.ModMulK1(&_s);
-            ry.ModSub(p2ys[g]);
-
-            // Update ph->px, ph->py directly to avoid Set()
-            ph->px[g].Set(&rx);
-            ph->py[g].Set(&ry);
-
-            // Update distance
-            ph->distance[g].ModAddK1order(distances[g]);
-
-            if (clientMode && isDPs[g]) {
-                ITEM it;
-                it.x.Set(&ph->px[g]);
-                it.d.Set(&ph->distance[g]);
-                it.kIdx = g;
-                dps.push_back(it);
+    if (clientMode) {
+        // Client mode loop
+        while (!endOfSearch) {
+            // Calculate jumps and initialize pointers
+            for (int g = 0; g < CPU_GRP_SIZE; g++) {
+                jmps[g] = ph->px[g].bits64[0] % NB_JUMP;
+                p1xs[g] = &jumpPointx[jmps[g]];
+                p1ys[g] = &jumpPointy[jmps[g]];
+                p2xs[g] = &ph->px[g];
+                p2ys[g] = &ph->py[g];
+                distances[g] = &jumpDistance[jmps[g]];
+                dx[g].ModSub(p2xs[g], p1xs[g]);
+                isDPs[g] = IsDP(ph->px[g].bits64[3]);
             }
-        }
+            grp.Set(dx);
+            grp.ModInv();
 
-        if (clientMode) {
+            for (int g = 0; g < CPU_GRP_SIZE; g++) {
+                dy.ModSub(p2ys[g], p1ys[g]);
+                _s.ModMulK1(&dy, &dx[g]);
+                _p.ModSquareK1(&_s);
+                rx.ModSub(&_p, p1xs[g]);
+                rx.ModSub(p2xs[g]);
+                ry.ModSub(p2xs[g], &rx);
+                ry.ModMulK1(&_s);
+                ry.ModSub(p2ys[g]);
+
+                // Update ph->px, ph->py directly to avoid Set()
+                ph->px[g].Set(&rx);
+                ph->py[g].Set(&ry);
+
+                // Update distance
+                ph->distance[g].ModAddK1order(distances[g]);
+
+                if (isDPs[g]) {
+                    ITEM it;
+                    it.x.Set(&ph->px[g]);
+                    it.d.Set(&ph->distance[g]);
+                    it.kIdx = g;
+                    dps.push_back(it);
+                }
+            }
+
             double now = Timer::get_tick();
             if (now - lastSent > SEND_PERIOD) {
                 LOCK(ghMutex);
@@ -372,9 +373,49 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
                 lastSent = now;
             }
             counters[thId] += CPU_GRP_SIZE;
-        } else {
-            // Add to table and collision check
+
+            // Save request
+            if (saveRequest && !endOfSearch) {
+                ph->isWaiting = true;
+                LOCK(saveMutex);
+                ph->isWaiting = false;
+                UNLOCK(saveMutex);
+            }
+        }
+    } else {
+        // Non-client mode loop
+        while (!endOfSearch) {
+            // Calculate jumps and initialize pointers
             for (int g = 0; g < CPU_GRP_SIZE; g++) {
+                jmps[g] = ph->px[g].bits64[0] % NB_JUMP;
+                p1xs[g] = &jumpPointx[jmps[g]];
+                p1ys[g] = &jumpPointy[jmps[g]];
+                p2xs[g] = &ph->px[g];
+                p2ys[g] = &ph->py[g];
+                distances[g] = &jumpDistance[jmps[g]];
+                dx[g].ModSub(p2xs[g], p1xs[g]);
+                isDPs[g] = IsDP(ph->px[g].bits64[3]);
+            }
+            grp.Set(dx);
+            grp.ModInv();
+
+            for (int g = 0; g < CPU_GRP_SIZE; g++) {
+                dy.ModSub(p2ys[g], p1ys[g]);
+                _s.ModMulK1(&dy, &dx[g]);
+                _p.ModSquareK1(&_s);
+                rx.ModSub(&_p, p1xs[g]);
+                rx.ModSub(p2xs[g]);
+                ry.ModSub(p2xs[g], &rx);
+                ry.ModMulK1(&_s);
+                ry.ModSub(p2ys[g]);
+
+                // Update ph->px, ph->py directly to avoid Set()
+                ph->px[g].Set(&rx);
+                ph->py[g].Set(&ry);
+
+                // Update distance
+                ph->distance[g].ModAddK1order(distances[g]);
+
                 if (isDPs[g]) {
                     LOCK(ghMutex);
                     if (!endOfSearch && !AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
@@ -387,14 +428,14 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
                 }
                 counters[thId]++;
             }
-        }
 
-        // Save request
-        if (saveRequest && !endOfSearch) {
-            ph->isWaiting = true;
-            LOCK(saveMutex);
-            ph->isWaiting = false;
-            UNLOCK(saveMutex);
+            // Save request
+            if (saveRequest && !endOfSearch) {
+                ph->isWaiting = true;
+                LOCK(saveMutex);
+                ph->isWaiting = false;
+                UNLOCK(saveMutex);
+            }
         }
     }
 
@@ -405,6 +446,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
 
     ph->isRunning = false;
 }
+
 
 // ----------------------------------------------------------------------------
 
