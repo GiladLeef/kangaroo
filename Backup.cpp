@@ -185,7 +185,7 @@ void Kangaroo::FetchWalks(uint64_t nbWalk,Int *x,Int *y,Int *d) {
 
 }
 
-void Kangaroo::FetchWalks(uint64_t nbWalk,std::vector<int128_t>& kangs,Int* x,Int* y,Int* d) {
+void Kangaroo::FetchWalks(uint64_t nbWalk,std::vector<int256_t>& kangs,Int* x,Int* y,Int* d) {
 
   uint64_t n = 0;
 
@@ -248,7 +248,7 @@ void Kangaroo::FectchKangaroos(TH_PARAM *threads) {
   double sFetch = Timer::get_tick();
 
   // From server
-  vector<int128_t> kangs;
+  vector<int256_t> kangs;
   if(saveKangarooByServer) {
     ::printf("FectchKangaroosFromServer");
     if(!GetKangaroosFromServer(workFile,kangs))
@@ -426,14 +426,14 @@ void Kangaroo::SaveWork(uint64_t totalCount,double totalTime,TH_PARAM *threads,i
     if(saveKangarooByServer) {
 
       ::printf("\nSaveWork (Kangaroo->Server): %s",fileName.c_str());
-      vector<int128_t> kangs;
+      vector<int256_t> kangs;
       for(int i = 0; i < nbThread; i++)
         totalWalk += threads[i].nbKangaroo;
       kangs.reserve(totalWalk);
 
       for(int i = 0; i < nbThread; i++) {
-        int128_t X;
-        int128_t D;
+        int256_t X;
+        int256_t D;
         uint64_t h;
         for(uint64_t n = 0; n < threads[i].nbKangaroo; n++) {
           HashTable::Convert(&threads[i].px[n],&threads[i].distance[n],n%2,&h,&X,&D);

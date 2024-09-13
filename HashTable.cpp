@@ -29,14 +29,21 @@ uint64_t HashTable::GetNbItem() {
     return totalItem;
 }
 
-ENTRY* HashTable::CreateEntry(int128_t *x, int128_t *d) {
-    ENTRY* e = (ENTRY*)malloc(sizeof(ENTRY));
-    e->x.i64[0] = x->i64[0];
-    e->x.i64[1] = x->i64[1];
-    e->d.i64[0] = d->i64[0];
-    e->d.i64[1] = d->i64[1];
-    return e;
+ENTRY *HashTable::CreateEntry(int256_t *x,int256_t *d) {
+
+  ENTRY *e = (ENTRY *)malloc(sizeof(ENTRY));
+  e->x.i64[0] = x->i64[0];
+  e->x.i64[1] = x->i64[1];
+  e->x.i64[2] = x->i64[2];
+  e->x.i64[3] = x->i64[3];
+  e->d.i64[0] = d->i64[0];
+  e->d.i64[1] = d->i64[1];
+  e->d.i64[2] = d->i64[2];
+  e->d.i64[3] = d->i64[3];
+  return e;
+
 }
+
 #define ADD_ENTRY(entry) {                 \
   /* Shift the end of the index table */   \
   for (int i = E[h].nbItem; i > st; i--)   \
@@ -44,26 +51,40 @@ ENTRY* HashTable::CreateEntry(int128_t *x, int128_t *d) {
   E[h].items[st] = entry;                  \
   E[h].nbItem++;}
 
-void HashTable::Convert(Int *x, Int *d, uint32_t type, uint64_t *h, int128_t *X, int128_t *D) {
-    uint64_t sign = 0;
-    uint64_t type64 = (uint64_t)type << 62;
-    X->i64[0] = x->bits64[0];
-    X->i64[1] = x->bits64[1];
-    if(d->bits64[3] > 0x7FFFFFFFFFFFFFFFULL) {
-        Int N(d);
-        N.ModNegK1order();
-        D->i64[0] = N.bits64[0];
-        D->i64[1] = N.bits64[1] & 0x3FFFFFFFFFFFFFFFULL;
-        sign = 1ULL << 63;
-    } else {
-        D->i64[0] = d->bits64[0];
-        D->i64[1] = d->bits64[1] & 0x3FFFFFFFFFFFFFFFULL;
-    }
-    D->i64[1] |= sign;
-    D->i64[1] |= type64;
-    *h = (x->bits64[2] & HASH_MASK);
-}
+void HashTable::Convert(Int *x,Int *d,uint32_t type,uint64_t *h,int256_t *X,int256_t *D) {
 
+  uint64_t sign = 0;
+  uint64_t type64 = (uint64_t)type << 62;
+
+  X->i64[0] = x->bits64[0];
+  X->i64[1] = x->bits64[1];
+  X->i64[2] = x->bits64[2];
+  X->i64[3] = x->bits64[3];
+  
+  
+
+  // Probability of failure (1/2^128)
+  if(d->bits64[3] > 0x7FFFFFFFFFFFFFFFULL) {
+    Int N(d);
+    N.ModNegK1order();
+    D->i64[0] = N.bits64[0];
+    D->i64[1] = N.bits64[1];
+    D->i64[2] = N.bits64[2];
+    D->i64[3] = N.bits64[3] & 0x3FFFFFFFFFFFFFFFULL;
+    sign = 1ULL << 63;
+  } else {
+    D->i64[0] = d->bits64[0];
+    D->i64[1] = d->bits64[1];
+    D->i64[2] = d->bits64[2];
+    D->i64[3] = d->bits64[3] & 0x3FFFFFFFFFFFFFFFULL;
+  }
+
+  D->i64[3] |= sign;
+  D->i64[3] |= type64;
+
+  *h = (x->bits64[2] & HASH_MASK);
+
+}
 #define AV1() if(pnb1) { ::fread(&e1,32,1,f1); pnb1--; }
 #define AV2() if(pnb2) { ::fread(&e2,32,1,f2); pnb2--; }
 
@@ -141,8 +162,8 @@ int HashTable::MergeH(uint32_t h, FILE* f1, FILE* f2, FILE* fd, uint32_t* nbDP, 
 }
 
 int HashTable::Add(Int *x, Int *d, uint32_t type) {
-    int128_t X;
-    int128_t D;
+    int256_t X;
+    int256_t D;
     uint64_t h;
     Convert(x,d,type,&h,&X,&D);
     ENTRY* e = CreateEntry(&X,&D);
@@ -157,12 +178,12 @@ void HashTable::ReAllocate(uint64_t h, uint32_t add) {
     E[h].items = nitems;
 }
 
-int HashTable::Add(uint64_t h, int128_t *x, int128_t *d) {
+int HashTable::Add(uint64_t h, int256_t *x, int256_t *d) {
     ENTRY *e = CreateEntry(x,d);
     return Add(h,e);
 }
 
-void HashTable::CalcDistAndType(int128_t d, Int* kDist, uint32_t* kType) {
+void HashTable::CalcDistAndType(int256_t d, Int* kDist, uint32_t* kType) {
     *kType = (d.i64[1] & 0x4000000000000000ULL) != 0;
     int sign = (d.i64[1] & 0x8000000000000000ULL) != 0;
     d.i64[1] &= 0x3FFFFFFFFFFFFFFFULL;
@@ -202,7 +223,7 @@ int HashTable::Add(uint64_t h, ENTRY* e) {
     return ADD_OK;
 }
 
-int HashTable::compare(int128_t *i1, int128_t *i2) {
+int HashTable::compare(int256_t *i1, int256_t *i2) {
     uint64_t *a = i1->i64;
     uint64_t *b = i2->i64;
     if(a[1] == b[1]) {
@@ -243,7 +264,7 @@ std::string HashTable::GetSizeInfo() {
     return std::string(ret);
 }
 
-std::string HashTable::GetStr(int128_t *i) {
+std::string HashTable::GetStr(int256_t *i) {
     std::string ret;
     char tmp[256];
     for(int n = 3; n >= 0; n--) {
