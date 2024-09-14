@@ -60,8 +60,6 @@ void HashTable::Convert(Int *x,Int *d,uint32_t type,uint64_t *h,int256_t *X,int2
   X->i64[1] = x->bits64[1];
   X->i64[2] = x->bits64[2];
   X->i64[3] = x->bits64[3];
-  
-  
 
   // Probability of failure (1/2^128)
   if(d->bits64[3] > 0x7FFFFFFFFFFFFFFFULL) {
@@ -204,7 +202,7 @@ int HashTable::Add(uint64_t h, ENTRY* e) {
     // Traverse the linked list to check for duplicates
     for (int i = 0; i < E[h].nbItem; i++) {
         if (compare(&e->x, &GET(h, i)->x) == 0) {
-            if ((e->d.i64[0] == GET(h, i)->d.i64[0]) && (e->d.i64[1] == GET(h, i)->d.i64[1])) {
+            if((e->d.i64[0] == GET(h,i)->d.i64[0]) && (e->d.i64[1] == GET(h,i)->d.i64[1]) && (e->d.i64[2] == GET(h,i)->d.i64[2]) && (e->d.i64[3] == GET(h,i)->d.i64[3]) ){
                 return ADD_DUPLICATE;
             } else {
                 CalcDistAndType(GET(h, i)->d, &kDist, &kType);
