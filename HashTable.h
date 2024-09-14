@@ -29,8 +29,8 @@ typedef union int256_s int256_t;
 
 typedef struct {
 
-  int256_t  x;    // Poisition of kangaroo (128bit LSB)
-  int256_t  d;    // Travelled distance (b127=sign b126=kangaroo type, b125..b0 distance
+  int256_t  x;    // Position of kangaroo (256bit LSB)
+  int256_t  d;    // Travelled distance (b255=sign b254=kangaroo type, b253..b0 distance
 
 } ENTRY;
 

@@ -122,7 +122,7 @@ int HashTable::MergeH(uint32_t h, FILE* f1, FILE* f2, FILE* fd, uint32_t* nbDP, 
                 AV1();
                 --nb1;
             } else if (comp == 0) {
-                if ((e1.d.i64[0] == e2.d.i64[0]) && (e1.d.i64[1] == e2.d.i64[1])) {
+                if((e1.d.i64[0] == e2.d.i64[0]) && (e1.d.i64[1] == e2.d.i64[1]) && (e1.d.i64[2] == e2.d.i64[2]) && (e1.d.i64[3] == e2.d.i64[3])) {
                     ++(*duplicate);
                 } else {
                     CalcDistAndType(e1.d, d1, k1);
@@ -190,6 +190,8 @@ void HashTable::CalcDistAndType(int256_t d, Int* kDist, uint32_t* kType) {
     kDist->SetInt32(0);
     kDist->bits64[0] = d.i64[0];
     kDist->bits64[1] = d.i64[1];
+    kDist->bits64[2] = d.i64[2];
+    kDist->bits64[3] = d.i64[3];
     if(sign) kDist->ModNegK1order();
 }
 int HashTable::Add(uint64_t h, ENTRY* e) {
