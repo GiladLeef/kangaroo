@@ -15,7 +15,7 @@ OBJET = $(addprefix $(OBJDIR)/, \
 
 CXX        = g++
 
-CXXFLAGS   =  -m64 -mssse3  -Wno-write-strings -Wno-unused-result -O3 -I.
+CXXFLAGS   =  -m64 -mssse3 -Wno-write-strings -Wno-unused-result -O3 -I.
 
 ifeq ($(OS),Windows_NT)
     LFLAGS = -static -static-libgcc -static-libstdc++ -lpthread -lws2_32
