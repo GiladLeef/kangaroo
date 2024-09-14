@@ -20,7 +20,7 @@ CXXFLAGS   =  -static -static-libgcc -static-libstdc++ -m64 -mssse3  -Wno-write-
 ifeq ($(OS),Windows_NT)
     LFLAGS = -static -static-libgcc -static-libstdc++ -lpthread -lws2_32
 else
-    LFLAGS = -static -static-libgcc -static-libstdc++ -lpthread
+    LFLAGS = -lpthread
 endif
 
 
