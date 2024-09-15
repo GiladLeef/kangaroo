@@ -628,11 +628,6 @@ void Kangaroo::RunServer() {
   }
   SetDP(initDPSize);
 
-  if(sizeof(DP) != 40) {
-    ::printf("Error: Invalid DP size struct\n");
-    exit(-1);
-  }
-
   if(saveKangaroo) {
     ::printf("Waring: Server does not support -ws, ignoring\n");
     saveKangaroo = false;
