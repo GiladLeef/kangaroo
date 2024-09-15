@@ -374,6 +374,8 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
           ::fread(&KBuff[k],16,1,f);
           // Checksum
           K.SetInt32(0);
+          K.bits64[3] = KBuff[k].i64[3];
+          K.bits64[2] = KBuff[k].i64[2];
           K.bits64[1] = KBuff[k].i64[1];
           K.bits64[0] = KBuff[k].i64[0];
           checkSum.Add(&K);
@@ -457,6 +459,8 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
           ::fwrite(&KBuff[k],16,1,f);
           // Checksum
           K.SetInt32(0);
+          K.bits64[3] = KBuff[k].i64[3];
+          K.bits64[2] = KBuff[k].i64[2];
           K.bits64[1] = KBuff[k].i64[1];
           K.bits64[0] = KBuff[k].i64[0];
           checkSum.Add(&K);
@@ -958,6 +962,8 @@ bool Kangaroo::GetKangaroosFromServer(std::string& fileName,std::vector<int256_t
         // Checksum
         Int K;
         K.SetInt32(0);
+        K.bits64[3] = KBuff[k].i64[3];
+        K.bits64[2] = KBuff[k].i64[2];
         K.bits64[1] = KBuff[k].i64[1];
         K.bits64[0] = KBuff[k].i64[0];
         checkSum.Add(&K);
@@ -1034,6 +1040,8 @@ bool Kangaroo::SendKangaroosToServer(std::string& fileName,std::vector<int256_t>
         // Checksum
         Int K;
         K.SetInt32(0);
+        K.bits64[3] = KBuff[k].i64[3];
+        K.bits64[2] = KBuff[k].i64[2];
         K.bits64[1] = KBuff[k].i64[1];
         K.bits64[0] = KBuff[k].i64[0];
         checkSum.Add(&K);
@@ -1084,8 +1092,12 @@ bool Kangaroo::SendToServer(std::vector<ITEM> &dps,uint32_t threadId) {
       dp[i].h = (uint32_t)h;
       dp[i].x.i64[0] = X.i64[0];
       dp[i].x.i64[1] = X.i64[1];
+      dp[i].x.i64[2] = X.i64[2];
+      dp[i].x.i64[3] = X.i64[3];
       dp[i].d.i64[0] = D.i64[0];
       dp[i].d.i64[1] = D.i64[1];
+      dp[i].d.i64[2] = D.i64[2];
+      dp[i].d.i64[3] = D.i64[3];
 
     }
 
