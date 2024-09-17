@@ -596,11 +596,7 @@ void Kangaroo::AcceptConnections(SOCKET server_soc) {
       ::memset(p,0,sizeof(TH_PARAM));
       char info[256];
       ::sprintf(info,"%s:%d",inet_ntoa(client_add.sin_addr),ntohs(client_add.sin_port));
-#ifdef WIN64
       p->clientInfo = ::strdup(info);
-#else
-      p->clientInfo = ::strdup(info);
-#endif
       p->obj = this;
       p->isRunning = true;
       p->clientSock = clientSock;
