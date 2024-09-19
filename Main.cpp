@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdexcept>
 #include <mutex>
+#include "GPU/GPUEngine.h"
 
 using namespace std;
 
@@ -113,6 +114,8 @@ static int dp = -1;
 static int nbCPUThread;
 static string configFile = "";
 static bool checkFlag = false;
+static bool gpuEnable = false;
+static vector<int> gpuId = { 0 };
 static vector<int> gridSize;
 static string workFile = "";
 static string checkWorkFile = "";
@@ -242,6 +245,17 @@ int main(int argc, char* argv[]) {
       CHECKARG("-sp",1);
       port = getInt("serverPort",argv[a]);
       a++;
+    } else if(strcmp(argv[a],"-gpu") == 0) {
+      gpuEnable = true;
+      a++;
+    } else if(strcmp(argv[a],"-gpuId") == 0) {
+      CHECKARG("-gpuId",1);
+      getInts("gpuId",gpuId,string(argv[a]),',');
+      a++;
+    } else if(strcmp(argv[a],"-g") == 0) {
+      CHECKARG("-g",1);
+      getInts("gridSize",gridSize,string(argv[a]),',');
+      a++;
     } else if(strcmp(argv[a],"-v") == 0) {
       ::exit(0);
     } else if(strcmp(argv[a],"-check") == 0) {
@@ -256,7 +270,18 @@ int main(int argc, char* argv[]) {
     }
 
   }
-  Kangaroo *v = new Kangaroo(secp,dp,workFile,iWorkFile,savePeriod,saveKangaroo,saveKangarooByServer,
+
+  if(gridSize.size() == 0) {
+    for(int i = 0; i < gpuId.size(); i++) {
+      gridSize.push_back(0);
+      gridSize.push_back(0);
+    }
+  } else if(gridSize.size() != gpuId.size() * 2) {
+    printf("Invalid gridSize or gpuId argument, must have coherent size\n");
+    exit(-1);
+  }
+
+  Kangaroo *v = new Kangaroo(secp,dp,gpuEnable, workFile,iWorkFile,savePeriod,saveKangaroo,saveKangarooByServer,
                              maxStep,wtimeout,port,ntimeout,serverIP,outputFile,splitWorkFile);
   if(checkFlag) {
     v->Check();  
@@ -289,7 +314,7 @@ int main(int argc, char* argv[]) {
     if(serverMode)
       v->RunServer();
     else
-      v->Run(nbCPUThread);
+      v->Run(nbCPUThread,gpuId,gridSize);
   }
 
   return 0;

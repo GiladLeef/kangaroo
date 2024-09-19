@@ -1061,7 +1061,7 @@ bool Kangaroo::SendKangaroosToServer(std::string& fileName,std::vector<int256_t>
 }
 
 // Send DP to Server
-bool Kangaroo::SendToServer(std::vector<ITEM> &dps,uint32_t threadId) {
+bool Kangaroo::SendToServer(std::vector<ITEM> &dps,uint32_t threadId,uint32_t gpuId) {
 
   int nbRead;
   int nbWrite;

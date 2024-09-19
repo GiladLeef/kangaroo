@@ -1,11 +1,12 @@
 #ifndef KANGAROOH
 #define KANGAROOH
 
-#include <pthread.h> // Include pthread.h
+#include <pthread.h>
 #include <string>
 #include <vector>
 #include <signal.h> 
 #include "Constants.h"
+#include "GPU/GPUEngine.h"
 
 #ifdef WIN64
 #define WIN32_LEAN_AND_MEAN
@@ -43,7 +44,11 @@ typedef struct {
   bool hasStarted;
   bool isWaiting;
   uint64_t nbKangaroo;
-
+#ifdef WITHGPU
+  int  gridSizeX;
+  int  gridSizeY;
+  int  gpuId;
+#endif
   Int *px; // Kangaroo position
   Int *py; // Kangaroo position
   Int *distance; // Travelled distance
@@ -96,10 +101,9 @@ class Kangaroo {
 
 public:
 
-  Kangaroo(Secp256K1 *secp,int32_t initDPSize,std::string &workFile,std::string &iWorkFile,
-           uint32_t savePeriod,bool saveKangaroo,bool saveKangarooByServer,double maxStep,int wtimeout,int sport,int ntimeout,
-           std::string serverIp,std::string outputFile,bool splitWorkfile);
-  void Run(int nbThread);
+Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,std::string &workFile,std::string &iWorkFile,uint32_t savePeriod,bool saveKangaroo,bool saveKangarooByServer,
+                   double maxStep,int wtimeout,int port,int ntimeout,std::string serverIp,std::string outputFile,bool splitWorkfile);
+  void Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize);
   void RunServer();
   bool ParseConfigFile(std::string &fileName);
   bool LoadWork(std::string &fileName);
@@ -116,6 +120,7 @@ public:
 
   // Threaded procedures
   void SolveKeyCPU(TH_PARAM *p);
+  void SolveKeyGPU(TH_PARAM *p);
   bool HandleRequest(TH_PARAM *p);
   bool MergePartition(TH_PARAM* p);
   bool CheckPartition(TH_PARAM* p);
@@ -134,7 +139,7 @@ private:
   void CreateJumpTable();
   bool AddToTable(uint64_t h,int256_t *x,int256_t *d);
   bool AddToTable(Int *pos,Int *dist,uint32_t kType);
-  bool SendToServer(std::vector<ITEM> &dp,uint32_t threadId);
+  bool SendToServer(std::vector<ITEM> &dp,uint32_t threadId,uint32_t gpuId);
   bool CheckKey(Int d1,Int d2,uint8_t type);
   bool CollisionCheck(Int* d1,uint32_t type1,Int* d2,uint32_t type2);
   void ComputeExpected(double dp,double *op,double *ram,double* overHead = NULL);
@@ -183,11 +188,13 @@ private:
   void Process(TH_PARAM *params,std::string unit);
 
   uint64_t getCPUCount();
+  uint64_t getGPUCount();
   bool isAlive(TH_PARAM *p);
   bool hasStarted(TH_PARAM *p);
   bool isWaiting(TH_PARAM *p);
 
   Secp256K1 *secp;
+  int  nbGPUThread;
   HashTable hashTable;
   uint64_t counters[256];
   int  nbCPUThread;
@@ -211,6 +218,8 @@ private:
   Point keyToSearchNeg;
   uint32_t keyIdx;
   bool endOfSearch;
+  bool useGpu;
+
   double expectedNbOp;
   double expectedMem;
   double maxStep;

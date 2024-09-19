@@ -279,6 +279,27 @@ void Kangaroo::FectchKangaroos(TH_PARAM *threads) {
 
     ::printf("Done\n");
 
+#ifdef WITHGPU
+    for(int i = 0; i < nbGPUThread; i++) {
+      ::printf(".");
+      int id = nbCPUThread + i;
+      uint64_t n = threads[id].nbKangaroo;
+      threads[id].px = new Int[n];
+      threads[id].py = new Int[n];
+      threads[id].distance = new Int[n];
+      if(!saveKangarooByServer)
+          FetchWalks(n,
+            threads[id].px,
+            threads[id].py,
+            threads[id].distance);
+      else
+          FetchWalks(n,kangs,
+            threads[id].px,
+            threads[id].py,
+            threads[id].distance);
+    }
+#endif
+
     double eFetch = Timer::get_tick();
 
     if(nbLoadedWalk != 0) {
