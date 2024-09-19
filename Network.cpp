@@ -6,11 +6,7 @@
 #include <math.h>
 #include <algorithm>
 #include <signal.h>
-#ifndef WIN64
 #include <pthread.h>
-#else
-#include "WinErrors.h"
-#endif
 
 using namespace std;
 
@@ -45,34 +41,6 @@ static SOCKET serverSock = 0;
 #define SERVER_BACKUP        2
 
 
-#ifdef WIN64
-
-#define close_socket(s) closesocket(s)
-
-typedef int socklen_t;
-
-string GetNetworkError() {
-
-  int err = WSAGetLastError();
-  bool found = false;
-  int i=0;
-  while(!found && i<NBWSAERRORS) {
-    found = (WSAERRORS[i].errCode == err);
-    if(!found) i++;
-  }
-
-  if(!found) {
-    char ret[256];
-    sprintf(ret,"WSA Error code %d",err);
-    return string(ret);
-  } else {
-    return string(WSAERRORS[i].mesg);
-  }
-
-}
-
-#else
-
 #define close_socket(s) close(s)
 
 string GetNetworkError() {
@@ -80,8 +48,6 @@ string GetNetworkError() {
   return string(strerror(errno));
 
 }
-
-#endif
 
 #define GET(name,s,b,bl,t)  if( (nbRead=Read(s,(char *)(b),bl,t))<0 ) { ::printf("\nReadError(" name "): %s\n",lastError.c_str()); isConnected = false; close_socket(s); return false; }
 #define PUT(name,s,b,bl,t)  if( (nbWrite=Write(s,(char *)(b),bl,t))<0 ) { ::printf("\nWriteError(" name "): %s\n",lastError.c_str()); isConnected = false; close_socket(s); return false; }
@@ -92,9 +58,6 @@ void sig_handler(int signo) {
   if(signo == SIGINT) {
     ::printf("\nTerminated\n");
     if(serverSock>0) close_socket(serverSock);
-#ifdef WIN64
-    WSACleanup();
-#endif
     exit(0);
   }
 }
@@ -118,11 +81,7 @@ int Kangaroo::WaitFor(SOCKET sock,int timeout,int mode) {
 
   do
     result = select((int)sock + 1,rd,wr,NULL,&tmout);
-#ifdef WIN64
-  while(result < 0 && WSAGetLastError() == WSAEINTR);
-#else
   while(result < 0 && errno == EINTR);
-#endif
 
   if(result == 0) {
     lastError = "The operation timed out";
@@ -149,12 +108,7 @@ int Kangaroo::Write(SOCKET sock,char *buf,int bufsize,int timeout) {
     // Write
     do
       written = send(sock,buf,bufsize,0);
-#ifdef WIN64
-    while(written == -1 && WSAGetLastError() == WSAEINTR);
-#else
     while(written == -1 && errno == EINTR);
-#endif
-
     if(written <= 0)
       break;
 
@@ -192,11 +146,8 @@ int Kangaroo::Read(SOCKET sock,char *buf,int bufsize,int timeout) { // Timeout i
     // Read
     do
       rd = recv(sock,buf,bufsize,0);
-#ifdef WIN64
-    while(rd == -1 && WSAGetLastError() == WSAEINTR);
-#else
+
     while(rd == -1 && errno == EINTR);
-#endif
     if( rd <= 0 )
       break;
 
@@ -217,20 +168,6 @@ int Kangaroo::Read(SOCKET sock,char *buf,int bufsize,int timeout) { // Timeout i
   }
 
   return total_read;
-
-}
-
-void Kangaroo::InitSocket() {
-
-#ifdef WIN64
-  // connect to Winscok DLL
-  WSADATA WSAData;
-  int err = WSAStartup(MAKEWORD(2,2),&WSAData);
-  if(err != 0) { 
-    ::printf("WSAStartup failed error : %d\n",err);
-    exit(-1);
-  }
-#endif
 
 }
 
@@ -639,8 +576,6 @@ void Kangaroo::RunServer() {
 
   // Server stuff
 
-  InitSocket();
-
   /* Create socket */
   serverSock = socket(AF_INET,SOCK_STREAM,0);
 
@@ -674,10 +609,6 @@ void Kangaroo::RunServer() {
 
   AcceptConnections(serverSock);
 
-#ifdef WIN64
-  WSACleanup();
-#endif
-
   return;
 
 }
@@ -696,8 +627,6 @@ bool Kangaroo::ConnectToServer(SOCKET *retSock) {
 
     if(signal(SIGINT,sig_handler) == SIG_ERR)
       ::printf("\nWarning:can't install singal handler\n");
-
-    InitSocket();
 
     struct hostent *host_info;
     host_info = gethostbyname(serverIp.c_str());
@@ -725,12 +654,7 @@ bool Kangaroo::ConnectToServer(SOCKET *retSock) {
   }
 
   // Use non blocking socket
-#ifdef WIN64
-  unsigned long iMode = 0;
-  if(ioctlsocket(sock,FIONBIO,&iMode) != 0) {
-#else
   if(fcntl(sock,F_SETFL,O_NONBLOCK) == -1) {
-#endif
     lastError = "Cannot use non blocking socket, " + GetNetworkError();
     close_socket(sock);
     return false;
@@ -744,11 +668,7 @@ bool Kangaroo::ConnectToServer(SOCKET *retSock) {
 
   int connectStatus = connect(sock,(struct sockaddr *)&server,sizeof(server));
 
-#ifdef WIN64
-  if((connectStatus < 0) && (WSAGetLastError() != WSAEINPROGRESS)) {
-#else
   if((connectStatus < 0) && (errno != EINPROGRESS)) {
-#endif
     lastError = "Cannot connect to host: " + GetNetworkError();
     close_socket(sock);
     return false;
@@ -765,13 +685,8 @@ bool Kangaroo::ConnectToServer(SOCKET *retSock) {
 
     // Check connection completion
     int socket_err;
-#ifdef WIN64
-    int serrlen = sizeof socket_err;
-    if(getsockopt(sock,SOL_SOCKET,SO_ERROR,(char *)&socket_err,&serrlen) != 0) {
-#else
     socklen_t serrlen = sizeof(socket_err);
     if(getsockopt(sock,SOL_SOCKET,SO_ERROR,&socket_err,&serrlen) == -1) {
-#endif
       lastError = "Cannot connect to host: " + GetNetworkError();
       close_socket(sock);
       return false;

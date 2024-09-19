@@ -186,9 +186,7 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
   double avgGpuKeyRate = 0.0;
   double lastSave = 0;
 
-#ifndef WIN64
   setvbuf(stdout, NULL, _IONBF, 0);
-#endif
 
   // Key rate smoothing filter
 #define FILTER_SIZE 8

@@ -52,10 +52,6 @@ LFLAGS     = -lpthread
 
 endif
 
-ifeq ($(OS),Windows_NT)
-    LFLAGS += -static -static-libgcc -static-libstdc++ -lws2_32
-endif
-
 ifdef gpu
 $(OBJDIR)/GPU/GPUEngine.o: GPU/GPUEngine.cu
 	$(NVCC) -maxrregcount=0 --ptxas-options=-v --compile --compiler-options -fPIC -ccbin $(CXXCUDA) -m64 -O3 -I$(CUDA)/include -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/GPU/GPUEngine.o -c GPU/GPUEngine.cu

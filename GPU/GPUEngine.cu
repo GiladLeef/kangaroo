@@ -1,7 +1,5 @@
-#ifndef WIN64
 #include <unistd.h>
 #include <stdio.h>
-#endif
 
 #include "GPUEngine.h"
 #include <cuda.h>

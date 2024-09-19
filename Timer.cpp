@@ -1,6 +1,3 @@
-#ifdef WIN64
-#include <Windows.h> 
-#endif
 #include "Timer.h"
 
 static const char *prefix[] = { "","Kilo","Mega","Giga","Tera","Peta","Hexa" };
@@ -77,23 +74,13 @@ void Timer::printResult(char *unit, int nbTry, double t0, double t1) {
 
 int Timer::getCoreNumber() {
 
-#ifdef WIN64
-  SYSTEM_INFO sysinfo;
-  GetSystemInfo(&sysinfo);
-  return sysinfo.dwNumberOfProcessors;
-#else
   return (size_t)sysconf(_SC_NPROCESSORS_ONLN);
-#endif
 
 }
 
 void Timer::SleepMillis(uint32_t millis) {
 
-#ifdef WIN64
-  Sleep(millis);
-#else
   usleep(millis*1000);
-#endif
 
 }
 

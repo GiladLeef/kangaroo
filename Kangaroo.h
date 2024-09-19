@@ -8,11 +8,6 @@
 #include "Constants.h"
 #include "GPU/GPUEngine.h"
 
-#ifdef WIN64
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <winsock2.h>
-#else
 typedef int SOCKET;
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -23,7 +18,6 @@ typedef int SOCKET;
 #include <sys/time.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
-#endif
 
 #include "SECPK1/SECP256k1.h"
 #include "HashTable.h"
@@ -173,7 +167,6 @@ private:
   int Read(SOCKET sock,char *buf,int bufsize,int timeout);
   bool GetConfigFromServer();
   bool ConnectToServer(SOCKET *retSock);
-  void InitSocket();
   void WaitForServer();
   int32_t GetServerStatus();
   bool SendKangaroosToServer(std::string& fileName,std::vector<int256_t>& kangs);
