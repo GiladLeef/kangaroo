@@ -18,7 +18,7 @@ void printUsage() {
     printf("Options:\n");
     printf(" -v: Print version\n");
     printf(" -d: Specify number of leading zeros for the DP method (default is auto)\n");
-    printf(" -t nbThread: Specify number of threads\n");
+    printf(" -t nbThread: Specify number of CPU threads\n");
     printf(" -gpu: Enable GPU computation\n");
     printf(" -gpuId 0,1: List of GPU(s) to use, default is 0\n");
     printf(" -g x,y: Specify GPU(s) kernel gridsize, default is 2*(MP),2*(Core/MP)\n");
