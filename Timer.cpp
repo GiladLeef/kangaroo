@@ -2,14 +2,12 @@
 
 static const char *prefix[] = { "","Kilo","Mega","Giga","Tera","Peta","Hexa" };
 
-
 #include <random>
 #include <sstream>
 #include <sys/time.h>
 #include <unistd.h>
 #include <string.h>
 time_t Timer::tickStart;
-
 
 void Timer::Init() {
 
