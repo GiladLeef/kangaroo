@@ -1083,7 +1083,7 @@ bool Kangaroo::GetConfigFromServer() {
   PUT("CMD",serverConn,&cmd,1,ntimeout);
   PUT("nbKangaroo",serverConn,&totalRW,sizeof(uint64_t),ntimeout);
 
-  ::printf("Succesfully connected to server: %s (Version %d)\n",serverIp.c_str(),version);
+  ::printf("Succesfully connected to server: %s\n",serverIp.c_str());
 
   keysToSearch.clear();
   keysToSearch.push_back(key);
