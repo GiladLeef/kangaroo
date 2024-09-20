@@ -51,3 +51,26 @@ The distinguished point (DP) method offers an efficient approach for storing ran
 ### Dealing with Work Files
 
 Work files can be saved periodically using various options (-w, -wi, -ws). When restarting a work, the -i option can be used, and work files can be merged offline. Work files are compatible and can be merged if they have the same key and range. The -wss option enables using the server to make kangaroo backups, facilitating work continuity across different configurations or hardware setups.
+
+
+## Compile on Ubuntu server
+
+```
+# Install a CUDA driver
+sudo apt-get install -y nvidia-open
+
+# Install Nvidia CUDA Toolkit
+
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb
+sudo apt-get update
+sudo apt-get -y install cuda-toolkit-12-6
+
+# Install g++ and make
+sudo apt-get install make g++
+
+# Compile CPU-ONLY version
+make
+
+# Compile with GPU support:
+make gpu=1 ccap=<integer> all
