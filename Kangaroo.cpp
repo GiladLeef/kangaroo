@@ -14,8 +14,6 @@ using namespace std;
 
 #define safe_delete_array(x) if(x) {delete[] x;x=NULL;}
 
-// ----------------------------------------------------------------------------
-
 Kangaroo::Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,string &workFile,string &iWorkFile,uint32_t savePeriod,bool saveKangaroo,bool saveKangarooByServer,
                    double maxStep,int wtimeout,int port,int ntimeout,string serverIp,string outputFile,bool splitWorkfile) {
 
@@ -55,8 +53,6 @@ Kangaroo::Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,string &workFi
   signal(SIGFPE, SIG_IGN);
 
 }
-
-// ----------------------------------------------------------------------------
 
 bool Kangaroo::ParseConfigFile(std::string &fileName) {
 
@@ -120,8 +116,6 @@ bool Kangaroo::ParseConfigFile(std::string &fileName) {
 
 }
 
-// ----------------------------------------------------------------------------
-
 bool Kangaroo::IsDP(uint64_t x) {
 
   return (x & dMask) == 0;
@@ -143,7 +137,6 @@ void Kangaroo::SetDP(int size) {
   ::printf("DP size: %d [0x%" PRIx64 "]\n",dpSize,dMask);
 }
 
-// ----------------------------------------------------------------------------
 bool Kangaroo::Output(Int* pk, char sInfo, int sType) {
     FILE* f = stdout;
     bool needToClose = false;
@@ -180,8 +173,6 @@ bool Kangaroo::Output(Int* pk, char sInfo, int sType) {
 
     return true;
 }
-
-// ----------------------------------------------------------------------------
 
 bool  Kangaroo::CheckKey(Int d1,Int d2,uint8_t type) {
 
@@ -259,8 +250,6 @@ bool Kangaroo::CollisionCheck(Int* d1,uint32_t type1,Int* d2,uint32_t type2) {
   return true;
 
 }
-
-// ----------------------------------------------------------------------------
 
 bool Kangaroo::AddToTable(Int *pos,Int *dist,uint32_t kType) {
 
@@ -540,8 +529,6 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
 
 }
 
-// ----------------------------------------------------------------------------
-
 void *_SolveKeyCPU(void *lpParam) {
   TH_PARAM *p = (TH_PARAM *)lpParam;
   p->obj->SolveKeyCPU(p);
@@ -552,7 +539,7 @@ void *_SolveKeyGPU(void *lpParam) {
   p->obj->SolveKeyGPU(p);
   return 0;
 }
-// ----------------------------------------------------------------------------
+
 void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstType, bool lock) {
     vector<Int> pk(nbKangaroo);
     vector<Point> S(nbKangaroo);
@@ -594,9 +581,6 @@ void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstTyp
         py[j].Set(&S[j].y);
     }
 }
-
-
-// ----------------------------------------------------------------------------
 
 void Kangaroo::CreateJumpTable() {
 
@@ -643,8 +627,6 @@ void Kangaroo::CreateJumpTable() {
 
 }
 
-// ----------------------------------------------------------------------------
-
 void Kangaroo::ComputeExpected(double dp,double *op,double *ram,double *overHead) {
 
   // Compute expected number of operation and memory
@@ -679,8 +661,6 @@ void Kangaroo::ComputeExpected(double dp,double *op,double *ram,double *overHead
     *overHead = *op/avgDP0;
 
 }
-
-// ----------------------------------------------------------------------------
 
 void Kangaroo::InitRange() {
 

@@ -12,10 +12,7 @@ using namespace std;
 
 static SOCKET serverSock = 0;
 
-// ------------------------------------------------------------------------------------------------------
 // Common part
-// ------------------------------------------------------------------------------------------------------
-
 #define MAX_CLIENT 256
 #define WAIT_FOR_READ  1
 #define WAIT_FOR_WRITE 2
@@ -172,7 +169,7 @@ int Kangaroo::Read(SOCKET sock,char *buf,int bufsize,int timeout) { // Timeout i
 }
 
 // ------------------------------------------------------------------------------------------------------
-// Server part
+// Server code
 // ------------------------------------------------------------------------------------------------------
 
 // Server status
@@ -214,8 +211,6 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
 
     switch(cmdBuff) {
 
-    // ----------------------------------------------------------------------------------------
-
     case SERVER_GETCONFIG: {
       ::printf("\nNew connection from %s\n",p->clientInfo);
 
@@ -229,14 +224,10 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
 
     } break;
 
-    // ----------------------------------------------------------------------------------------
-
     case SERVER_SETKNB: {
       GET("nbKangaroo",p->clientSock,&p->nbKangaroo,sizeof(uint64_t),ntimeout);
       totalRW += p->nbKangaroo;
     } break;
-
-    // ----------------------------------------------------------------------------------------
 
     case SERVER_RESETDEAD: {
       char response[5];
@@ -245,8 +236,6 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
       sprintf(response,"OK\n");
       PUT("resp",p->clientSock,&response,3,ntimeout);
     } break;
-
-    // ----------------------------------------------------------------------------------------
 
     case SERVER_LOADKANG: {
 
@@ -332,8 +321,6 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
 
       
     } break;
-
-    // ----------------------------------------------------------------------------------------
 
     case SERVER_SAVEKANG: {
 
@@ -428,8 +415,6 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
       PUT("Status",p->clientSock,&state,sizeof(int32_t),ntimeout);
 
     } break;
-
-    // ----------------------------------------------------------------------------------------
 
     case SERVER_SENDDP: {
 
@@ -613,9 +598,9 @@ void Kangaroo::RunServer() {
 
 }
 
-// ------------------------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------
 // Client part
-// ------------------------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------
 
 // Connection to the server
 bool Kangaroo::ConnectToServer(SOCKET *retSock) {

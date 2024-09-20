@@ -82,8 +82,6 @@ double getDouble(string name,char *v) {
 
 }
 
-// ------------------------------------------------------------------------------------------
-
 void getInts(string name,vector<int> &tokens,const string &text,char sep) {
 
   size_t start = 0,end = 0;
@@ -110,7 +108,6 @@ void getInts(string name,vector<int> &tokens,const string &text,char sep) {
   }
 
 }
-// ------------------------------------------------------------------------------------------
 
 // Default params
 static int dp = -1;

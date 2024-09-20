@@ -67,9 +67,6 @@ void Int::ModNeg() {
   Add(&_P);
 }
 
-
-// ------------------------------------------------
-
 // INV256[x] = x^-1 (mod 256)
 int64_t INV256[] = {
     -0LL,-1LL,-0LL,-235LL,-0LL,-141LL,-0LL,-183LL,-0LL,-57LL,-0LL,-227LL,-0LL,-133LL,-0LL,-239LL,
@@ -157,8 +154,6 @@ void Int::DivStep62(Int* u, Int* v, int64_t* eta, int* pos, int64_t* uu, int64_t
     *vv = ((int64_t *)&_v)[1];
 }
 
-// ------------------------------------------------
-
 uint64_t totalCount;
 void Int::ModInv() {
     // Compute modular inverse of this mod _P
@@ -228,8 +223,6 @@ void Int::ModInv() {
     Set(&r);
 }
 
-// ------------------------------------------------
-
 void Int::ModExp(Int *e) {
 
   Int base(this);
@@ -245,8 +238,6 @@ void Int::ModExp(Int *e) {
 
 }
 
-// ------------------------------------------------
-
 void Int::ModMul(Int *a) {
 
   Int p;
@@ -255,8 +246,6 @@ void Int::ModMul(Int *a) {
 
 }
 
-// ------------------------------------------------
-
 void Int::ModSquare(Int *a) {
 
   Int p;
@@ -264,8 +253,6 @@ void Int::ModSquare(Int *a) {
   MontgomeryMult(&_R2, &p);
 
 }
-
-// ------------------------------------------------
 
 void Int::ModCube(Int *a) {
 
@@ -276,8 +263,6 @@ void Int::ModCube(Int *a) {
   MontgomeryMult(&_R3, &p2);
 
 }
-
-// ------------------------------------------------
 
 bool Int::HasSqrt() {
 
@@ -292,7 +277,6 @@ bool Int::HasSqrt() {
 
 }
 
-// ------------------------------------------------
 void Int::ModSqrt() {
     if (_P.IsEven()) {
         CLEAR();
@@ -365,9 +349,6 @@ void Int::ModSqrt() {
     }
 }
 
-
-// ------------------------------------------------
-
 void Int::ModMul(Int *a, Int *b) {
 
   Int p;
@@ -376,13 +357,9 @@ void Int::ModMul(Int *a, Int *b) {
 
 }
 
-// ------------------------------------------------
-
 Int* Int::GetFieldCharacteristic() {
   return &_P;
 }
-
-// ------------------------------------------------
 
 Int* Int::GetR() {
   return &_R;
@@ -397,7 +374,6 @@ Int* Int::GetR4() {
   return &_R4;
 }
 
-// ------------------------------------------------
 
 void Int::SetupField(Int *n, Int *R, Int *R2, Int *R3, Int *R4) {
 

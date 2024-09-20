@@ -13,7 +13,6 @@
 Int _ONE((uint64_t)1);
 
 
-// ------------------------------------------------
 
 Int::Int() {
 }
@@ -41,7 +40,6 @@ Int::Int(uint64_t u64) {
 
 }
 
-// ------------------------------------------------
 
 void Int::CLEAR() {
 
@@ -55,7 +53,6 @@ void Int::CLEARFF() {
 
 }
 
-// ------------------------------------------------
 
 void Int::Set(Int *a) {
 
@@ -64,7 +61,6 @@ void Int::Set(Int *a) {
 
 }
 
-// ------------------------------------------------
 
 void Int::Add(Int *a) {
 
@@ -77,7 +73,6 @@ void Int::Add(Int *a) {
 
 }
 
-// ------------------------------------------------
 
 void Int::Add(uint64_t a) {
 
@@ -89,7 +84,6 @@ void Int::Add(uint64_t a) {
 	c = _addcarry_u64(c, bits64[4], 0, bits64 + 4);
 }
 
-// ------------------------------------------------
 void Int::AddOne() {
 
   unsigned char c = 0;
@@ -101,7 +95,6 @@ void Int::AddOne() {
 
 }
 
-// ------------------------------------------------
 
 void Int::Add(Int *a,Int *b) {
 
@@ -114,7 +107,6 @@ void Int::Add(Int *a,Int *b) {
 
 }
 
-// ------------------------------------------------
 
 uint64_t Int::AddCh(Int* a,uint64_t ca,Int* b,uint64_t cb) {
 
@@ -143,7 +135,6 @@ uint64_t Int::AddCh(Int* a,uint64_t ca) {
   return carry;
 
 }
-// ------------------------------------------------
 
 uint64_t Int::AddC(Int* a) {
 
@@ -158,7 +149,6 @@ uint64_t Int::AddC(Int* a) {
 
 }
 
-// ------------------------------------------------
 
 void Int::AddAndShift(Int* a,Int* b,uint64_t cH) {
 
@@ -172,7 +162,6 @@ void Int::AddAndShift(Int* a,Int* b,uint64_t cH) {
 
 }
 
-// ------------------------------------------------
 
 void Int::MatrixVecMul(Int* u,Int* v,int64_t _11,int64_t _12,int64_t _21,int64_t _22,uint64_t* cu,uint64_t* cv) {
 
@@ -199,7 +188,6 @@ void Int::MatrixVecMul(Int* u,Int* v,int64_t _11,int64_t _12,int64_t _21,int64_t
 
 }
 
-// ------------------------------------------------
 
 bool Int::IsGreater(Int *a) {
 
@@ -219,7 +207,6 @@ bool Int::IsGreater(Int *a) {
 
 }
 
-// ------------------------------------------------
 
 bool Int::IsLower(Int *a) {
 
@@ -239,7 +226,6 @@ bool Int::IsLower(Int *a) {
 
 }
 
-// ------------------------------------------------
 
 bool Int::IsGreaterOrEqual(Int *a) {
 
@@ -249,7 +235,6 @@ bool Int::IsGreaterOrEqual(Int *a) {
 
 }
 
-// ------------------------------------------------
 
 bool Int::IsLowerOrEqual(Int *a) {
 
@@ -290,7 +275,6 @@ bool Int::IsZero() {
 }
 
 
-// ------------------------------------------------
 
 void Int::SetInt32(uint32_t value) {
 
@@ -299,13 +283,11 @@ void Int::SetInt32(uint32_t value) {
 
 }
 
-// ------------------------------------------------
 
 uint32_t Int::GetInt32() {
   return bits[0];
 }
 
-// ------------------------------------------------
 
 unsigned char Int::GetByte(int n) {
   
@@ -335,7 +317,6 @@ void Int::Get32Bytes(unsigned char *buff) {
 
 }
 
-// ------------------------------------------------
 
 void Int::SetByte(int n,unsigned char byte) {
 
@@ -344,19 +325,16 @@ void Int::SetByte(int n,unsigned char byte) {
 
 }
 
-// ------------------------------------------------
 
 void Int::SetDWord(int n,uint32_t b) {
   bits[n] = b;
 }
 
-// ------------------------------------------------
 
 void Int::SetQWord(int n, uint64_t b) {
 	bits64[n] = b;
 }
 
-// ------------------------------------------------
 
 void Int::Sub(Int *a) {
 
@@ -369,7 +347,6 @@ void Int::Sub(Int *a) {
 
 }
 
-// ------------------------------------------------
 
 void Int::Sub(Int *a,Int *b) {
 
@@ -404,19 +381,16 @@ void Int::SubOne() {
 
 }
 
-// ------------------------------------------------
 
 bool Int::IsPositive() {
   return (int64_t)(bits64[NB64BLOCK - 1])>=0;
 }
 
-// ------------------------------------------------
 
 bool Int::IsNegative() {
   return (int64_t)(bits64[NB64BLOCK - 1])<0;
 }
 
-// ------------------------------------------------
 
 bool Int::IsStrictPositive() {
   if( IsPositive() )
@@ -425,19 +399,16 @@ bool Int::IsStrictPositive() {
 	  return false;
 }
 
-// ------------------------------------------------
 
 bool Int::IsEven() {
   return (bits[0] & 0x1) == 0;
 }
 
-// ------------------------------------------------
 
 bool Int::IsOdd() {
   return (bits[0] & 0x1) == 1;
 }
 
-// ------------------------------------------------
 
 void Int::Neg() {
 
@@ -450,7 +421,6 @@ void Int::Neg() {
 
 }
 
-// ------------------------------------------------
 
 void Int::ShiftL32Bit() {
 
@@ -461,7 +431,6 @@ void Int::ShiftL32Bit() {
 
 }
 
-// ------------------------------------------------
 
 void Int::ShiftL64Bit() {
 
@@ -472,7 +441,6 @@ void Int::ShiftL64Bit() {
 
 }
 
-// ------------------------------------------------
 
 void Int::ShiftL64BitAndSub(Int *a,int n) {
 
@@ -489,7 +457,6 @@ void Int::ShiftL64BitAndSub(Int *a,int n) {
 
 }
 
-// ------------------------------------------------
 
 void Int::ShiftL(uint32_t n) {
 
@@ -507,7 +474,6 @@ void Int::ShiftL(uint32_t n) {
   
 }
 
-// ------------------------------------------------
 
 void Int::ShiftR32Bit() {
 
@@ -521,7 +487,6 @@ void Int::ShiftR32Bit() {
 
 }
 
-// ------------------------------------------------
 
 void Int::ShiftR64Bit() {
 
@@ -553,7 +518,6 @@ void Int::ShiftR(uint32_t n) {
   
 }
 
-// ------------------------------------------------
 
 void Int::SwapBit(int bitNumber) {
 
@@ -568,7 +532,6 @@ void Int::SwapBit(int bitNumber) {
 
 }
 
-// ------------------------------------------------
 
 void Int::Mult(Int *a) {
 
@@ -577,7 +540,6 @@ void Int::Mult(Int *a) {
 
 }
 
-// ------------------------------------------------
 
 uint64_t Int::IMult(int64_t a) {
 
@@ -594,7 +556,6 @@ uint64_t Int::IMult(int64_t a) {
 
 }
 
-// ------------------------------------------------
 
 uint64_t Int::Mult(uint64_t a) {
 
@@ -603,7 +564,6 @@ uint64_t Int::Mult(uint64_t a) {
   return carry;
 
 }
-// ------------------------------------------------
 
 uint64_t Int::IMult(Int *a, int64_t b) {
   
@@ -633,7 +593,6 @@ uint64_t Int::IMult(Int *a, int64_t b) {
 }
 
 
-// ------------------------------------------------
 
 uint64_t Int::Mult(Int *a, uint64_t b) {
 
@@ -643,7 +602,6 @@ uint64_t Int::Mult(Int *a, uint64_t b) {
 
 }
 
-// ------------------------------------------------
 
 void Int::Mult(Int *a,Int *b) {
   
@@ -669,7 +627,6 @@ void Int::Mult(Int *a,Int *b) {
 
 }
 
-// ------------------------------------------------
 
 uint64_t Int::Mult(Int *a,uint32_t b) {
   uint64_t carry;
@@ -677,7 +634,6 @@ uint64_t Int::Mult(Int *a,uint32_t b) {
   return carry;
 }
 
-// ------------------------------------------------
 
 double Int::ToDouble() {
 
@@ -693,7 +649,6 @@ double Int::ToDouble() {
 
 }
 
-// ------------------------------------------------
 
 int Int::GetBitLength() {
 
@@ -708,7 +663,6 @@ int Int::GetBitLength() {
 
 }
 
-// ------------------------------------------------
 
 int Int::GetSize() {
 
@@ -718,7 +672,6 @@ int Int::GetSize() {
 
 }
 
-// ------------------------------------------------
 
 int Int::GetSize64() {
 
@@ -728,7 +681,6 @@ int Int::GetSize64() {
 
 }
 
-// ------------------------------------------------
 
 void Int::MultModN(Int *a,Int *b,Int *n) {
 
@@ -739,7 +691,6 @@ void Int::MultModN(Int *a,Int *b,Int *n) {
 
 }
 
-// ------------------------------------------------
 
 void Int::Mod(Int *n) {
 
@@ -749,7 +700,6 @@ void Int::Mod(Int *n) {
 
 }
 
-// ------------------------------------------------
 
 int Int::GetLowestBit() {
 
@@ -760,7 +710,6 @@ int Int::GetLowestBit() {
 
 }
 
-// ------------------------------------------------
 
 void Int::MaskByte(int n) {
 
@@ -769,7 +718,6 @@ void Int::MaskByte(int n) {
 
 }
 
-// ------------------------------------------------
 
 void Int::Abs() {
 
@@ -778,7 +726,6 @@ void Int::Abs() {
 
 }
 
-// ------------------------------------------------
 
 void Int::Rand(int nbit) {
 
@@ -795,7 +742,6 @@ void Int::Rand(int nbit) {
 
 }
 
-// ------------------------------------------------
 
 void Int::Rand(Int *randMax) {
 
@@ -809,7 +755,6 @@ void Int::Rand(Int *randMax) {
 
 }
 
-// ------------------------------------------------
 
 void Int::Div(Int *a,Int *mod) {
 
@@ -912,7 +857,6 @@ void Int::Div(Int *a,Int *mod) {
 
 }
 
-// ------------------------------------------------
 
 void Int::GCD(Int *a) {
 
@@ -972,7 +916,6 @@ void Int::GCD(Int *a) {
 
 }
 
-// ------------------------------------------------
 
 void Int::SetBase10(char *value) {  
 
@@ -990,25 +933,21 @@ void Int::SetBase10(char *value) {
 
 }
 
-// ------------------------------------------------
 
 void  Int::SetBase16(char *value) {  
   SetBaseN(16,"0123456789ABCDEF",value);
 }
 
-// ------------------------------------------------
 
 std::string Int::GetBase10() {
   return GetBaseN(10,"0123456789");
 }
 
-// ------------------------------------------------
 
 std::string Int::GetBase16() {
   return GetBaseN(16,"0123456789ABCDEF");
 }
 
-// ------------------------------------------------
 
 std::string Int::GetBlockStr() {
 	
@@ -1023,7 +962,6 @@ std::string Int::GetBlockStr() {
 	return std::string(tmp);
 }
 
-// ------------------------------------------------
 
 std::string Int::GetC64Str(int nbDigit) {
 
@@ -1044,7 +982,6 @@ std::string Int::GetC64Str(int nbDigit) {
   return std::string(tmp);
 }
 
-// ------------------------------------------------
 
 void  Int::SetBaseN(int n,char *charset,char *value) {
 
@@ -1071,7 +1008,6 @@ void  Int::SetBaseN(int n,char *charset,char *value) {
 
 }
 
-// ------------------------------------------------
 
 std::string Int::GetBaseN(int n,char *charset) {
 
@@ -1113,7 +1049,6 @@ std::string Int::GetBaseN(int n,char *charset) {
 
 }
 
-// ------------------------------------------------
 
 
 int Int::GetBit(uint32_t n) {
@@ -1125,7 +1060,6 @@ int Int::GetBit(uint32_t n) {
 
 }
 
-// ------------------------------------------------
 
 std::string Int::GetBase2() {
 
@@ -1201,7 +1135,6 @@ extern int64_t iCountMax;
 extern int64_t iCountTotal;
 extern int64_t iCountHist[12];
 
-// ------------------------------------------------
 
 bool Int::CheckInv(Int* a) {
 
@@ -1271,7 +1204,7 @@ void Int::Check() {
 
   printf("GetBase10() Results OK\n");
 
-  // Add -------------------------------------------------------------------------------------------
+  // Add 
   t0 = Timer::get_tick();
   for (i = 0; i < 10000; i++) c.Add(&a, &b);
   t1 = Timer::get_tick();
@@ -1284,7 +1217,7 @@ void Int::Check() {
     return;
   }
 
-  // Mult -------------------------------------------------------------------------------------------
+  // Mult
   a.SetBase10("3890902718436931151119442452387018319292503094706912504064239834754167");
   b.SetBase10("474325684416838476798716793141429285759783676422570987096960746354");
   e.SetBase10("1845555094921934741640873731771879197054909502699192730283220486240724687661257894226660948002650341240452881231721004292250660431557118");
@@ -1301,7 +1234,7 @@ void Int::Check() {
     return;
   }
   
-  // Div -------------------------------------------------------------------------------------------
+  // Div
   tTotal = 0.0;
   ok = true;
   for (int i = 0; i < 1000 && ok; i++) {
@@ -1341,9 +1274,6 @@ void Int::Check() {
   // Modular arithmetic -------------------------------------------------------------------------------
   // SecpK1 prime
   b.SetBase16("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
-  //b.SetBase16("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141");
-  //b.SetBase16("7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFED");
-  //b.SetBase16("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFDC7");
   Int::SetupField(&b);
   printf("R1=%s\n",Int::GetR()->GetBase16().c_str());
   printf("R2=%s\n",Int::GetR2()->GetBase16().c_str());
@@ -1352,7 +1282,7 @@ void Int::Check() {
   int pSize = Int::GetFieldCharacteristic()->GetBitLength();
   printf("Field characteristic size: %dbits\n",pSize);
 
-  // ModInv -------------------------------------------------------------------------------------------
+  // ModInv 
 
   ok = true;
   for (int i = 0; i < 10000 && ok; i++) {
@@ -1446,7 +1376,7 @@ void Int::Check() {
   printf("ModInv() cycles : %.2f\n",(double)(c1-c0)/400000.0);
   double movInvCost = (t1-t0);
 
-  // ModSqrt ------------------------------------------------------------------------------------
+  // ModSqrt
 
   ok = true;
   for(int i = 0; i < 1000 && ok; i++) {
@@ -1474,7 +1404,7 @@ void Int::Check() {
   b.SetBase16("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
   if( Int::GetFieldCharacteristic()->IsEqual(&b) ) {
 
-    // IntGroup -----------------------------------------------------------------------------------
+    // IntGroup 
     Int m[256];
     Int chk[256];
     IntGroup g(256);
@@ -1509,7 +1439,7 @@ void Int::Check() {
     printf("IntGroup.ModInv() Results OK : ");
     Timer::printResult("Inv",1000 * 256,0,t1 - t0);
 
-    // ModMulK1 ------------------------------------------------------------------------------------
+    // ModMulK1
 
     for(int i = 0; i < 100000; i++) {
       a.Rand(pSize);
@@ -1537,7 +1467,7 @@ void Int::Check() {
     printf("ModMulK1() Results OK : ");
     Timer::printResult("Mult",1000000,0,t1 - t0);
 
-    // ModSqrK1 ------------------------------------------------------------------------------------
+    // ModSqrK1
 
     for(int i = 0; i < 100000; i++) {
       a.Rand(pSize);

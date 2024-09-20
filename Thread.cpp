@@ -7,9 +7,6 @@
 
 using namespace std;
 
-// ----------------------------------------------------------------------------
-
-
 THREAD_HANDLE Kangaroo::LaunchThread(void *(*func) (void *), TH_PARAM *p) {
   THREAD_HANDLE h;
   p->obj = this;
@@ -23,8 +20,6 @@ void  Kangaroo::JoinThreads(THREAD_HANDLE *handles, int nbThread) {
 void  Kangaroo::FreeHandles(THREAD_HANDLE *handles, int nbThread) {
 }
 
-// ----------------------------------------------------------------------------
-
 bool Kangaroo::isAlive(TH_PARAM *p) {
 
   bool isAlive = false;
@@ -36,8 +31,6 @@ bool Kangaroo::isAlive(TH_PARAM *p) {
 
 }
 
-// ----------------------------------------------------------------------------
-
 bool Kangaroo::hasStarted(TH_PARAM *p) {
 
   bool hasStarted = true;
@@ -48,8 +41,6 @@ bool Kangaroo::hasStarted(TH_PARAM *p) {
   return hasStarted;
 
 }
-
-// ----------------------------------------------------------------------------
 
 bool Kangaroo::isWaiting(TH_PARAM *p) {
 
@@ -70,7 +61,6 @@ uint64_t Kangaroo::getGPUCount() {
   return count;
 
 }
-// ----------------------------------------------------------------------------
 
 uint64_t Kangaroo::getCPUCount() {
 
@@ -80,8 +70,6 @@ uint64_t Kangaroo::getCPUCount() {
   return count;
 
 }
-
-// ----------------------------------------------------------------------------
 
 string Kangaroo::GetTimeStr(double dTime) {
 

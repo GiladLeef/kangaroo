@@ -11,8 +11,6 @@
 #include "GPUMath.h"
 #include "GPUCompute.h"
 
-// ---------------------------------------------------------------------------------------
-
 __global__ void comp_kangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t *found,uint64_t dpMask) {
 
   int xPtr = (blockIdx.x*blockDim.x*GPU_GRP_SIZE) * KSIZE; // x[4] , y[4] , d[2], lastJump
@@ -20,39 +18,6 @@ __global__ void comp_kangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t *f
 
 }
 
-// ---------------------------------------------------------------------------------------
-//#define GPU_CHECK
-#ifdef GPU_CHECK
-__global__ void check_gpu() {
-
-  // Check ModInv
-  uint64_t N[5] = { 0x0BE3D7593BE1147CULL,0x4952AAF512875655ULL,0x08884CCAACCB9B53ULL,0x9EAE2E2225044292ULL,0ULL };
-  uint64_t I[5];
-  uint64_t R[5];
-  bool ok = true;
-
-  I[4] = 0;
-  R[4] = 0;
-  for(uint64_t i = 0; i < 100000 && ok; i++) {
-
-    _ModSqr(I,N);
-    _ModMult(R,N,N);
-    if(!_IsEqual(I,R)) {
-      ok = false;
-      printf("_ModSqr wrong %d\n",(int)i);
-      printf("N = %016llx %016llx %016llx %016llx %016llx\n",N[4],N[3],N[2],N[1],N[0]);
-      printf("I = %016llx %016llx %016llx %016llx %016llx\n",I[4],I[3],I[2],I[1],I[0]);
-      printf("R = %016llx %016llx %016llx %016llx %016llx\n",R[4],R[3],R[2],R[1],R[0]);
-    }
-
-    N[0]++;
-
-  }
-
-}
-#endif
-
-// ---------------------------------------------------------------------------------------
 
 using namespace std;
 
@@ -195,21 +160,6 @@ GPUEngine::GPUEngine(int nbThreadGroup,int nbThreadPerGroup,int gpuId,uint32_t m
   lostWarning = false;
   initialised = true;
   wildOffset.SetInt32(0);
-
-#ifdef GPU_CHECK
-
-  double minT = 1e9;
-  for(int i=0;i<5;i++) {
-    double t0 = Timer::get_tick();
-    check_gpu<<<1,1>>>();
-    cudaThreadSynchronize();
-    double t1 = Timer::get_tick();
-    if( (t1-t0)<minT ) minT = (t1-t0);
-  }
-  printf("Cuda: %.3f ms\n",minT*1000.0);
-  exit(0);
-
-#endif
 
 }
 
@@ -371,11 +321,6 @@ void GPUEngine::SetKangaroos(Int *px,Int *py,Int *d) {
         inputKangarooPinned[g * strideSize + t + 8 * nbThreadPerGroup] = dOff.bits64[0];
         inputKangarooPinned[g * strideSize + t + 9 * nbThreadPerGroup] = dOff.bits64[1];
 
-#ifdef USE_SYMMETRY
-        // Last jump
-        inputKangarooPinned[t + 10 * nbThreadPerGroup] = (uint64_t)NB_JUMP;
-#endif
-
         idx++;
       }
 
@@ -489,12 +434,6 @@ void GPUEngine::SetKangaroo(uint64_t kIdx,Int *px,Int *py,Int *d) {
   cudaMemcpy(inputKangaroo + (b * blockSize + g * strideSize + t + 8 * nbThreadPerGroup),inputKangarooPinned,8,cudaMemcpyHostToDevice);
   inputKangarooPinned[0] = dOff.bits64[1];
   cudaMemcpy(inputKangaroo + (b * blockSize + g * strideSize + t + 9 * nbThreadPerGroup),inputKangarooPinned,8,cudaMemcpyHostToDevice);
-
-#ifdef USE_SYMMETRY
-  // Last jump
-  inputKangarooPinned[0] = (uint64_t)NB_JUMP;
-  cudaMemcpy(inputKangaroo + (b * blockSize + g * strideSize + t + 10 * nbThreadPerGroup),inputKangarooPinned,8,cudaMemcpyHostToDevice);
-#endif
 
 }
 

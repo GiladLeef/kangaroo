@@ -162,7 +162,6 @@ bool Kangaroo::MergeWorkPartPart(std::string& part1Name,std::string& part2Name) 
 
   t0 = Timer::get_tick();
 
-  // ---------------------------------------------------
   string file1 = part1Name + "/header";
   bool partIsEmpty = IsEmpty(file1);
   string file2 = part2Name + "/header";
@@ -202,8 +201,6 @@ bool Kangaroo::MergeWorkPartPart(std::string& part1Name,std::string& part2Name) 
     ::fclose(f1);
 
   }
-
-  // ---------------------------------------------------
 
   FILE* f2 = ReadHeader(file2,&v2,HEADW);
   if(f2 == NULL) {
@@ -481,7 +478,6 @@ bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool print
 
   t0 = Timer::get_tick();
 
-  // ---------------------------------------------------
   string file1 = partName + "/header";
   if( IsEmpty(file1) ) 
     return FillEmptyPartFromFile(partName,file2,printStat);
@@ -513,8 +509,6 @@ bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool print
     return true;
   }
   ::fclose(f1);
-
-  // ---------------------------------------------------
 
   FILE* f2 = ReadHeader(file2,&v2,HEADW);
   if(f2 == NULL) {

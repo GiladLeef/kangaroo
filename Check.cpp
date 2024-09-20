@@ -110,7 +110,6 @@ void Kangaroo::CheckPartition(int nbCore,std::string& partName) {
 
   t0 = Timer::get_tick();
 
-  // ---------------------------------------------------
   FILE* f1 = ReadHeader(partName+"/header",&v1,HEADW);
   if(f1 == NULL)
     return;
@@ -220,7 +219,6 @@ void Kangaroo::CheckWorkFile(int nbCore,std::string& fileName) {
     
   t0 = Timer::get_tick();
 
-  // ---------------------------------------------------
   FILE* f1 = ReadHeader(fileName,&v1,HEADW);
   if(f1 == NULL)
     return;

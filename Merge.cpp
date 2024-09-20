@@ -41,7 +41,6 @@ bool Kangaroo::MergeWork(std::string& file1, std::string& file2, std::string& de
 
   t0 = Timer::get_tick();
 
-  // ---------------------------------------------------
   FILE* f1 = ReadHeader(file1, &v1, HEADW);
   if (f1 == NULL)
     return false;

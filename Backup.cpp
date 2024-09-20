@@ -10,9 +10,6 @@
 
 using namespace std;
 
-
-// ----------------------------------------------------------------------------
-
 int Kangaroo::FSeek(FILE* stream,uint64_t pos) {
 
   return fseeko(stream,pos,SEEK_SET);
@@ -160,8 +157,6 @@ bool Kangaroo::LoadWork(string &fileName) {
 
   return true;
 }
-
-// ----------------------------------------------------------------------------
 
 void Kangaroo::FetchWalks(uint64_t nbWalk,Int *x,Int *y,Int *d) {
 
@@ -318,8 +313,6 @@ void Kangaroo::FectchKangaroos(TH_PARAM *threads) {
 
 }
 
-
-// ----------------------------------------------------------------------------
 bool Kangaroo::SaveHeader(string fileName,FILE* f,int type,uint64_t totalCount,double totalTime) {
 
   // Header
