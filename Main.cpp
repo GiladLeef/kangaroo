@@ -19,6 +19,9 @@ void printUsage() {
     printf(" -v: Print version\n");
     printf(" -d: Specify number of leading zeros for the DP method (default is auto)\n");
     printf(" -t nbThread: Specify number of threads\n");
+    printf(" -gpu: Enable GPU computation\n");
+    printf(" -gpuId 0,1: List of GPU(s) to use, default is 0\n");
+    printf(" -g x,y: Specify GPU(s) kernel gridsize, default is 2*(MP),2*(Core/MP)\n");
     printf(" -w workfile: Specify file to save work into (current processed key only)\n");
     printf(" -i workfile: Specify file to load work from (current processed key only)\n");
     printf(" -wi workInterval: Periodic interval (in seconds) for saving work\n");
