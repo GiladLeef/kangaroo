@@ -6,8 +6,9 @@ This program offers a powerful solution for tackling the Elliptic Curve Discrete
 - **Fixed-size arithmetic:** Utilizes fixed-size arithmetic for efficient computation.
 - **Fast modular inversion:** Implements fast modular inversion using Delayed Right Shift 62 bits.
 - **Fast modular multiplication:** Utilizes 2 steps folding 512 bits to 256 bits reduction using 64-bit digits.
+- **Multi-GPU support:** with CUDA optimisation via inline PTX assembly.
 
-This program is heavly based on https://github.com/JeanLucPons/Kangaroo.
+This program is based on https://github.com/JeanLucPons/Kangaroo.
 ### How It Works
 
 The algorithm employs two herds of kangaroos, a tame herd, and a wild herd. When a kangaroo from each herd collides, the key can be solved. The distinguished points method with a hashtable is used to detect collisions efficiently. The algorithm iteratively updates the positions of the kangaroos until a collision is detected, leading to the solution of the ECDLP.
