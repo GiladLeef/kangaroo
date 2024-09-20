@@ -280,9 +280,25 @@ int main(int argc, char* argv[]) {
     printf("Invalid gridSize or gpuId argument, must have coherent size\n");
     exit(-1);
   }
+    
+  Kangaroo *v = new Kangaroo(
+    secp, 
+    dp, 
+    gpuEnable, 
+    workFile, 
+    iWorkFile, 
+    savePeriod, 
+    saveKangaroo, 
+    saveKangarooByServer, 
+    maxStep, 
+    wtimeout, 
+    port, 
+    ntimeout, 
+    serverIP, 
+    outputFile, 
+    splitWorkFile
+    );
 
-  Kangaroo *v = new Kangaroo(secp,dp,gpuEnable, workFile,iWorkFile,savePeriod,saveKangaroo,saveKangarooByServer,
-                             maxStep,wtimeout,port,ntimeout,serverIP,outputFile,splitWorkFile);
   if(checkFlag) {
     v->Check();  
     exit(0);
