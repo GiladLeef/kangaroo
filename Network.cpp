@@ -20,7 +20,7 @@ static SOCKET serverSock = 0;
 #define WAIT_FOR_READ  1
 #define WAIT_FOR_WRITE 2
 
-#define SERVER_VERSION 1
+#define SERVER_VERSION 1.1
 
 #define SERVER_HEADER 0x67DEDDC1
 
