@@ -18,7 +18,6 @@ __global__ void comp_kangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t *f
 
 }
 
-
 using namespace std;
 
 int _ConvertSMVer2Cores(int major,int minor) {
@@ -58,9 +57,7 @@ int _ConvertSMVer2Cores(int major,int minor) {
 
     index++;
   }
-
   return 0;
-
 }
 
 void GPUEngine::SetWildOffset(Int* offset) {
@@ -228,9 +225,7 @@ void *GPUEngine::AllocatePinnedMemory(size_t size) {
     printf("GPUEngine: AllocatePinnedMemory: %s\n",cudaGetErrorString(err));
     return NULL;
   }
-
   return buff;
-
 }
 
 void GPUEngine::FreePinnedMemory(void *buff) {
@@ -490,7 +485,6 @@ void GPUEngine::SetParams(uint64_t dpMask,Int *distance,Int *px,Int *py) {
 }
 
 bool GPUEngine::callKernelAndWait() {
-
   // Debug function
   callKernel();
   cudaMemcpy(outputItemPinned,outputItem,outputSize,cudaMemcpyDeviceToHost);
@@ -499,24 +493,15 @@ bool GPUEngine::callKernelAndWait() {
     printf("GPUEngine: callKernelAndWait: %s\n",cudaGetErrorString(err));
     return false;
   }
-
   return true;
-
 }
 
 bool GPUEngine::Launch(std::vector<ITEM> &hashFound,bool spinWait) {
-
-
   hashFound.clear();
-
   // Get the result
-
   if(spinWait) {
-
     cudaMemcpy(outputItemPinned,outputItem,outputSize,cudaMemcpyDeviceToHost);
-
   } else {
-
     // Use cudaMemcpyAsync to avoid default spin wait of cudaMemcpy wich takes 100% CPU
     cudaEvent_t evt;
     cudaEventCreate(&evt);
@@ -527,7 +512,6 @@ bool GPUEngine::Launch(std::vector<ITEM> &hashFound,bool spinWait) {
       Timer::SleepMillis(1);
     }
     cudaEventDestroy(evt);
-
   }
 
   cudaError_t err = cudaGetLastError();
@@ -573,7 +557,5 @@ bool GPUEngine::Launch(std::vector<ITEM> &hashFound,bool spinWait) {
 
     hashFound.push_back(it);
   }
-
   return callKernel();
-
 }
