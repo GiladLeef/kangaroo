@@ -5,16 +5,12 @@
 #include "../Constants.h"
 #include "../SECPK1/SECP256k1.h"
 
-
 #define KSIZE 10
-
 #define ITEM_SIZE   56
 #define ITEM_SIZE32 (ITEM_SIZE/4)
 
 class GPUEngine {
-
 public:
-
   GPUEngine(int nbThreadGroup,int nbThreadPerGroup,int gpuId,uint32_t maxFound);
   ~GPUEngine();
   void SetParams(uint64_t dpMask,Int *distance,Int *px,Int *py);
@@ -37,7 +33,6 @@ public:
   static bool GetGridSize(int gpuId,int *x,int *y);
 
 private:
-
   Int wildOffset;
   int nbThread;
   int nbThreadPerGroup;
@@ -54,7 +49,6 @@ private:
   uint32_t kangarooSizePinned;
   uint32_t jumpSize;
   uint64_t dpMask;
-
 };
 
 #endif // GPUENGINEH
