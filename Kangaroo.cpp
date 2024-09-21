@@ -594,7 +594,7 @@ void Kangaroo::CreateJumpTable() {
     jumpPointy[i].Set(&J.y);
   }
 
-  ::printf("Jump Avg distance: 2^%.2f\n",log2(distAvg));
+  ::printf("Jump average distance: 2^%.2f\n",log2(distAvg));
 
   unsigned long seed = Timer::getSeed32();
   rseed(seed);
@@ -664,7 +664,7 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
 #endif
     uint64_t totalThread = (uint64_t)nbCPUThread + (uint64_t)nbGPUThread;
     if(totalThread == 0) {
-      ::printf("No CPU or GPU thread, exiting.\n");
+      ::printf("No CPU or GPU threads found, exiting...\n");
       ::exit(0);
     }
     TH_PARAM *params = (TH_PARAM *)malloc(totalThread * sizeof(TH_PARAM));
@@ -720,9 +720,9 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
 
         ComputeExpected((double)initDPSize, &expectedNbOp, &expectedMem);
         if (nbLoadedWalk == 0)
-            ::printf("Suggested DP: %d\n", suggestedDP);
+            ::printf("Recommended DP: %d\n", suggestedDP);
         ::printf("Expected operations: 2^%.2f\n", log2(expectedNbOp));
-        ::printf("Expected RAM: %.1fMB\n", expectedMem);
+        ::printf("Expected RAM usage: %.1fMB\n", expectedMem);
     }
     else {
         keyIdx = 0;
@@ -758,7 +758,6 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
             // Wait for end
             Process(params, "MK/s");
             JoinThreads(thHandles, nbCPUThread);
-            FreeHandles(thHandles, nbCPUThread);
             hashTable.Reset();
     }
     double t1 = Timer::getTick();

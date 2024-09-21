@@ -177,7 +177,6 @@ private:
   THREAD_HANDLE LaunchThread(void *(*func) (void *), TH_PARAM *p);
 
   void JoinThreads(THREAD_HANDLE *handles, int nbThread);
-  void FreeHandles(THREAD_HANDLE *handles, int nbThread);
   void Process(TH_PARAM *params,std::string unit);
 
   uint64_t getCPUCount();

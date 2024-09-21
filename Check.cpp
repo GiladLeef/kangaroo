@@ -176,7 +176,6 @@ void Kangaroo::CheckPartition(int nbCore,std::string& partName) {
     }
 
     JoinThreads(thHandles,nbThread);
-    FreeHandles(thHandles,nbThread);
 
     for(int i = 0; i < nbThread; i++) {
       free(params[i].part1Name);
@@ -290,7 +289,6 @@ void Kangaroo::CheckWorkFile(int nbCore,std::string& fileName) {
       thHandles[i] = LaunchThread(_checkWorkThread,params + i);
     }
     JoinThreads(thHandles,nbThread);
-    FreeHandles(thHandles,nbThread);
 
     for(int i = 0; i < nbThread; i++)
       nbWrong += params[i].hStop;

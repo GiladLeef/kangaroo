@@ -17,58 +17,43 @@ void  Kangaroo::JoinThreads(THREAD_HANDLE *handles, int nbThread) {
   for (int i = 0; i < nbThread; i++)
     pthread_join(handles[i], NULL);
 }
-void  Kangaroo::FreeHandles(THREAD_HANDLE *handles, int nbThread) {
-}
 
 bool Kangaroo::isAlive(TH_PARAM *p) {
-
   bool isAlive = false;
   int total = nbCPUThread + nbGPUThread;
   for(int i=0;i<total;i++)
     isAlive = isAlive || p[i].isRunning;
-
   return isAlive;
-
 }
 
 bool Kangaroo::hasStarted(TH_PARAM *p) {
-
   bool hasStarted = true;
   int total = nbCPUThread + nbGPUThread;
   for (int i = 0; i < total; i++)
     hasStarted = hasStarted && p[i].hasStarted;
-
   return hasStarted;
-
 }
 
 bool Kangaroo::isWaiting(TH_PARAM *p) {
-
   bool isWaiting = true;
   int total = nbCPUThread + nbGPUThread;
   for (int i = 0; i < total; i++)
     isWaiting = isWaiting && p[i].isWaiting;
-
   return isWaiting;
-
 }
 
 uint64_t Kangaroo::getGPUCount() {
-
   uint64_t count = 0;
   for(int i = 0; i<nbGPUThread; i++)
     count += counters[0x80L + i];
   return count;
-
 }
 
 uint64_t Kangaroo::getCPUCount() {
-
   uint64_t count = 0;
   for(int i=0;i<nbCPUThread;i++)
     count += counters[i];
   return count;
-
 }
 
 string Kangaroo::GetTimeStr(double dTime) {
@@ -165,7 +150,6 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
 
   double t0;
   double t1;
-
   uint64_t count;
   uint64_t lastCount = 0;
   uint64_t gpuCount = 0;
@@ -266,17 +250,15 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
         Timer::SleepMillis(1000);
       }
     }
-
     lastCount = count;
     lastGPUCount = gpuCount;
     t0 = t1;
-
   }
 
   count = getCPUCount() + getGPUCount();
   t1 = Timer::getTick();
-  
-  if( !endOfSearch ) {
+
+  if(!endOfSearch) {
     printf("\r[%.2f %s][GPU %.2f %s][Cnt 2^%.2f][%s]  ",
       avgKeyRate / 1000000.0,unit.c_str(),
       avgGpuKeyRate / 1000000.0,unit.c_str(),
@@ -284,5 +266,4 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
       GetTimeStr(t1 - startTime).c_str()
       );
   }
-
 }

@@ -324,7 +324,6 @@ bool Kangaroo::MergeWorkPartPart(std::string& part1Name,std::string& part2Name) 
     }
 
     JoinThreads(thHandles,nbThread);
-    FreeHandles(thHandles,nbThread);
 
     for(int i = 0; i < nbThread; i++) {
       free(params[i].part1Name);

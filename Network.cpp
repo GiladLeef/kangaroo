@@ -475,7 +475,7 @@ void Kangaroo::RunServer() {
 
   ComputeExpected((double)initDPSize,&expectedNbOp,&expectedMem);
   ::printf("Expected operations: 2^%.2f\n",log2(expectedNbOp));
-  ::printf("Expected RAM: %.1fMB\n",expectedMem);
+  ::printf("Expected RAM usage: %.1fMB\n",expectedMem);
 
   if(initDPSize<0) {
     ::printf("Error: Server must be launched with a specified number of distinguished bits (-d)\n");
