@@ -4,9 +4,6 @@
 // Release number
 #define RELEASE "1.1"
 
-// Number of random jumps
-#define NB_JUMP 32
-
 // Kangaroo type
 #define TAME 0  // Tame kangaroo
 #define WILD 1  // Wild kangaroo
