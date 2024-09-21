@@ -61,7 +61,6 @@ __device__ __constant__ uint64_t jPy[NB_JUMP][4];
   UADDC1(r[3], 0xFFFFFFFFFFFFFFFFULL); \
   UADD1(r[4], 0ULL);}
 
-
 #define SubP(r) { \
   USUBO1(r[0], 0xFFFFFFFEFFFFFC2FULL); \
   USUBC1(r[1], 0xFFFFFFFFFFFFFFFFULL); \
@@ -76,14 +75,12 @@ __device__ __constant__ uint64_t jPy[NB_JUMP][4];
   USUBC(r[3], a[3], b[3]); \
   USUB(r[4], a[4], b[4]);}
 
-
 #define Sub1(r,a) {\
   USUBO1(r[0], a[0]); \
   USUBC1(r[1], a[1]); \
   USUBC1(r[2], a[2]); \
   USUBC1(r[3], a[3]); \
   USUB1(r[4], a[4]);}
-
 
 #define Add128(r,a) { \
   UADDO1((r)[0], (a)[0]); \
@@ -112,7 +109,6 @@ USUB(r[4],0ULL,r[4]); }
   (r)[2] = (a)[2]; \
   (r)[3] = (a)[3]; \
   (r)[4] = (a)[4];}
-
 
 #define _LoadI64(r, a, carry) {\
   (r)[0] = a; \
