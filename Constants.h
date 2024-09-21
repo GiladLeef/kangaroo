@@ -10,15 +10,16 @@
 // Kangaroo type
 #define TAME 0  // Tame kangaroo
 #define WILD 1  // Wild kangaroo
+
 // Number of random jumps
-// Max 512 for the GPU
-#define NB_JUMP 32
+#define NB_JUMP 32 // Max 512 for the GPU
 
 // GPU group size
 #define GPU_GRP_SIZE 128
 
 // GPU number of run per kernel call
 #define NB_RUN 64
+
 // SendDP Period in sec
 #define SEND_PERIOD 2.0
 
