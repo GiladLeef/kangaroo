@@ -5,7 +5,6 @@
 Secp256K1::Secp256K1() {}
 
 void Secp256K1::Init() {
-
   // Prime for the finite field
   Int P;
   P.SetBase16("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
@@ -32,14 +31,11 @@ void Secp256K1::Init() {
     }
     GTable[i * 256 + 255] = N; // Dummy point for check function
   }
-
 }
 
-Secp256K1::~Secp256K1() {
-}
+Secp256K1::~Secp256K1() {}
 
 Point Secp256K1::ComputePublicKey(Int *privKey,bool reduce) {
-
   int i = 0;
   Point Q;
   Q.Clear();
@@ -61,7 +57,6 @@ Point Secp256K1::ComputePublicKey(Int *privKey,bool reduce) {
 
   if(reduce) Q.Reduce();
   return Q;
-
 }
 
 std::vector<Point> Secp256K1::ComputePublicKeys(std::vector<Int> &privKeys) {
@@ -89,7 +84,6 @@ std::vector<Point> Secp256K1::ComputePublicKeys(std::vector<Int> &privKeys) {
     return pts;
 }
 
-
 Point Secp256K1::NextKey(Point &key) {
   // Input key must be reduced and different from G
   // in order to use AddDirect
@@ -97,10 +91,8 @@ Point Secp256K1::NextKey(Point &key) {
 }
 
 uint8_t Secp256K1::GetByte(std::string &str, int idx) {
-
   char tmp[3];
   int  val;
-
   tmp[0] = str.data()[2 * idx];
   tmp[1] = str.data()[2 * idx + 1];
   tmp[2] = 0;
@@ -115,9 +107,7 @@ uint8_t Secp256K1::GetByte(std::string &str, int idx) {
 }
 
 bool Secp256K1::ParsePublicKeyHex(std::string str,Point &ret,bool &isCompressed) {
-
   ret.Clear();
-
   if (str.length() < 2) {
     printf("ParsePublicKeyHex: Error invalid public key specified (66 or 130 character length)\n");
     return false;
@@ -178,13 +168,11 @@ bool Secp256K1::ParsePublicKeyHex(std::string str,Point &ret,bool &isCompressed)
 }
 
 std::string Secp256K1::GetPublicKeyHex(bool compressed, Point &pubKey) {
-
   unsigned char publicKeyBytes[128];
   char tmp[3];
   std::string ret;
 
   if (!compressed) {
-
     // Full public key
     publicKeyBytes[0] = 0x4;
     pubKey.x.Get32Bytes(publicKeyBytes + 1);
@@ -194,9 +182,7 @@ std::string Secp256K1::GetPublicKeyHex(bool compressed, Point &pubKey) {
       sprintf(tmp, "%02X", (int)publicKeyBytes[i]);
       ret.append(tmp);
     }
-
   } else {
-
     // Compressed public key
     publicKeyBytes[0] = pubKey.y.IsEven() ? 0x2 : 0x3;
     pubKey.x.Get32Bytes(publicKeyBytes + 1);
@@ -207,9 +193,7 @@ std::string Secp256K1::GetPublicKeyHex(bool compressed, Point &pubKey) {
     }
 
   }
-
   return ret;
-
 }
 Point Secp256K1::AddDirect(Point &p1, Point &p2) {
     Int dy, dx, s, p, temp;
@@ -275,10 +259,8 @@ std::vector<Point> Secp256K1::AddDirect(std::vector<Point> &p1, std::vector<Poin
             pts.push_back(r);
         }
     }
-
     return pts;
 }
-
 
 Point Secp256K1::Add2(Point &p1, Point &p2) {
     // Ensure p2.z = 1 for the operation
@@ -401,13 +383,10 @@ Int Secp256K1::GetY(Int x, bool isEven) {
     if (p.IsEven() != isEven) {
         p.ModNeg();
     }
-
     return p;
 }
 
-
 bool Secp256K1::EC(Point &p) {
-
   Int _s;
   Int _p;
 
@@ -418,5 +397,4 @@ bool Secp256K1::EC(Point &p) {
   _s.ModSub(&_p);
 
   return _s.IsZero(); // ( ((pow2(y) - (pow3(x) + 7)) % P) == 0 );
-
 }
