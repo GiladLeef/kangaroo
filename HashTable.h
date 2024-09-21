@@ -20,12 +20,9 @@ union int256_s {
         uint64_t i64[4];
 };
 
-
 typedef union int256_s int256_t;
 
 #define safe_free(x) if(x) {free(x);x=NULL;}
-
-// We store only 128 (+18) bit a the x value which give a probabilty a wrong collision after 2^73 entries
 
 typedef struct {
 

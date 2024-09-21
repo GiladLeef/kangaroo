@@ -1205,9 +1205,9 @@ void Int::Check() {
   printf("GetBase10() Results OK\n");
 
   // Add 
-  t0 = Timer::get_tick();
+  t0 = Timer::getTick();
   for (i = 0; i < 10000; i++) c.Add(&a, &b);
-  t1 = Timer::get_tick();
+  t1 = Timer::getTick();
 
   if (c.GetBase10() == "6422570987096960746354") {
     printf("Add() Results OK : ");
@@ -1222,9 +1222,9 @@ void Int::Check() {
   b.SetBase10("474325684416838476798716793141429285759783676422570987096960746354");
   e.SetBase10("1845555094921934741640873731771879197054909502699192730283220486240724687661257894226660948002650341240452881231721004292250660431557118");
 
-  t0 = Timer::get_tick();
+  t0 = Timer::getTick();
   for (i = 0; i < 10000; i++) c.Mult(&a, &b);
-  t1 = Timer::get_tick();
+  t1 = Timer::getTick();
 
   if (c.IsEqual(&e)) {
     printf("Mult() Results OK : ");
@@ -1244,9 +1244,9 @@ void Int::Check() {
     d.Set(&a);
     e.Set(&b);
 
-    t0 = Timer::get_tick();
+    t0 = Timer::getTick();
     a.Div(&b, &c);
-    t1 = Timer::get_tick();
+    t1 = Timer::getTick();
     tTotal += (t1 - t0);
 
     f.Set(&a);
@@ -1271,8 +1271,8 @@ void Int::Check() {
     Timer::printResult("Div", 1000, 0, tTotal);
   }
 
-  // Modular arithmetic -------------------------------------------------------------------------------
-  // SecpK1 prime
+  // Modular arithmetic
+  // SECP256K1 prime
   b.SetBase16("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F");
   Int::SetupField(&b);
   printf("R1=%s\n",Int::GetR()->GetBase16().c_str());
@@ -1362,14 +1362,14 @@ void Int::Check() {
 
   a.Rand(pSize);
   b.Rand(pSize-64);
-  t0 = Timer::get_tick();
+  t0 = Timer::getTick();
   uint64_t c0 = __rdtsc();
   for (int i = 0; i < 400000; i++) {
     a.Add(&b);
     a.ModInv();
   }
   uint64_t c1 = __rdtsc();
-  t1 = Timer::get_tick();
+  t1 = Timer::getTick();
 
   printf("ModInv() Results OK : ");
   Timer::printResult("Inv", 400000, 0, t1 - t0);
@@ -1427,14 +1427,14 @@ void Int::Check() {
       }
     }
 
-    t0 = Timer::get_tick();
+    t0 = Timer::getTick();
     for(int j = 0; j < 1000; j++) {
       for(int i = 0; i < 256; i++) {
         m[i].Rand(pSize);
       }
       g.ModInv();
     }
-    t1 = Timer::get_tick();
+    t1 = Timer::getTick();
 
     printf("IntGroup.ModInv() Results OK : ");
     Timer::printResult("Inv",1000 * 256,0,t1 - t0);
@@ -1456,13 +1456,13 @@ void Int::Check() {
 
     a.Rand(pSize);
     b.Rand(pSize);
-    t0 = Timer::get_tick();
+    t0 = Timer::getTick();
     for(int i = 0; i < 1000000; i++) {
       a.AddOne();
       b.AddOne();
       c.ModMulK1(&a,&b);
     }
-    t1 = Timer::get_tick();
+    t1 = Timer::getTick();
 
     printf("ModMulK1() Results OK : ");
     Timer::printResult("Mult",1000000,0,t1 - t0);
@@ -1483,13 +1483,13 @@ void Int::Check() {
 
     a.Rand(pSize);
     b.Rand(pSize);
-    t0 = Timer::get_tick();
+    t0 = Timer::getTick();
     for(int i = 0; i < 1000000; i++) {
       a.AddOne();
       b.AddOne();
       c.ModSquareK1(&b);
     }
-    t1 = Timer::get_tick();
+    t1 = Timer::getTick();
 
     printf("ModSquareK1() Results OK : ");
     Timer::printResult("Sqr",1000000,0,t1 - t0);
@@ -1498,7 +1498,7 @@ void Int::Check() {
     double cost = (1000000.0/400000.0) * movInvCost / (t1 - t0);
     printf("ModInv() Cost : %.1f S\n",cost);
 
-    // ModMulK1 order -----------------------------------------------------------------------------
+    // ModMulK1 order
     // InitK1() is done by secpK1
     b.SetBase16("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141");
     Int::SetupField(&b);
@@ -1517,14 +1517,14 @@ void Int::Check() {
       }
     }
 
-    t0 = Timer::get_tick();
+    t0 = Timer::getTick();
     for(int i = 0; i < 1000000; i++) {
       a.Rand(pSize);
       b.Rand(pSize);
       c.Set(&a);
       c.ModMulK1order(&b);
     }
-    t1 = Timer::get_tick();
+    t1 = Timer::getTick();
 
     printf("ModMulK1order() Results OK : ");
     Timer::printResult("Mult",1000000,0,t1 - t0);

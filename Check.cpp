@@ -108,7 +108,7 @@ void Kangaroo::CheckPartition(int nbCore,std::string& partName) {
   double t1;
   uint32_t v1;
 
-  t0 = Timer::get_tick();
+  t0 = Timer::getTick();
 
   FILE* f1 = ReadHeader(partName+"/header",&v1,HEADW);
   if(f1 == NULL)
@@ -189,7 +189,7 @@ void Kangaroo::CheckPartition(int nbCore,std::string& partName) {
   free(params);
   free(thHandles);
 
-  t1 = Timer::get_tick();
+  t1 = Timer::getTick();
 
   double O = (double)nbWrong / (double)nbDP;
   O = (1.0-O) * 100.0;
@@ -217,7 +217,7 @@ void Kangaroo::CheckWorkFile(int nbCore,std::string& fileName) {
     return;
   }
     
-  t0 = Timer::get_tick();
+  t0 = Timer::getTick();
 
   FILE* f1 = ReadHeader(fileName,&v1,HEADW);
   if(f1 == NULL)
@@ -304,7 +304,7 @@ void Kangaroo::CheckWorkFile(int nbCore,std::string& fileName) {
   free(params);
   free(thHandles);
 
-  t1 = Timer::get_tick();
+  t1 = Timer::getTick();
 
   double O = (double)nbWrong / (double)nbDP;
   O = (1.0 - O) * 100.0;
@@ -340,15 +340,15 @@ void Kangaroo::Check() {
     priv.push_back(rnd);
   }
 
-  t0 = Timer::get_tick();
+  t0 = Timer::getTick();
   for(int i = 0; i<nbKey; i++)
     pts1.push_back(secp->ComputePublicKey(&priv[i]));
-  t1 = Timer::get_tick();
+  t1 = Timer::getTick();
   ::printf("ComputePublicKey %d : %.3f KKey/s\n",nbKey,(double)nbKey / ((t1 - t0)*1000.0));
 
-  t0 = Timer::get_tick();
+  t0 = Timer::getTick();
   pts2 = secp->ComputePublicKeys(priv);
-  t1 = Timer::get_tick();
+  t1 = Timer::getTick();
   ::printf("ComputePublicKeys %d : %.3f KKey/s\n",nbKey,(double)nbKey / ((t1 - t0)*1000.0));
 
   bool ok = true;

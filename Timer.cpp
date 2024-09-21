@@ -15,7 +15,7 @@ void Timer::Init() {
 
 }
 
-double Timer::get_tick() {
+double Timer::getTick() {
 
     struct timeval tv;
     gettimeofday(&tv, NULL);

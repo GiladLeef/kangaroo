@@ -9,7 +9,7 @@ class Timer {
 
 public:
   static void Init();
-  static double get_tick();
+  static double getTick();
   static void printResult(char *unit, int nbTry, double t0, double t1);
   static std::string getResult(char *unit, int nbTry, double t0, double t1);
   static int getCoreNumber();

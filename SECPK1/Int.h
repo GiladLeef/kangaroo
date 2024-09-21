@@ -105,7 +105,7 @@ public:
   void ModSqrt();                            // this <- +/-sqrt(this) (mod n)
   bool HasSqrt();                            // true if this admit a square root
 
-  // Specific SecpK1
+  // Specific SECP256K1
   static void InitK1(Int *order);
   void ModMulK1(Int *a, Int *b);
   void ModMulK1(Int *a);

@@ -486,7 +486,7 @@ void Int::MontgomeryMult(Int *a, Int *b) {
 }
 
 
-// SecpK1 specific section -----------------------------------------------------------------------------
+// SECP256K1 specific section
 
 void Int::ModMulK1(Int *a, Int *b) {
 
@@ -768,9 +768,9 @@ void Int::ModSquareK1(Int *a) {
   bits64[4] = 0;
 }
 
-static Int _R2o;                               // R^2 for SecpK1 order modular mult
-static uint64_t MM64o = 0x4B0DFF665588B13FULL; // 64bits lsb negative inverse of SecpK1 order
-static Int *_O;                                // SecpK1 order
+static Int _R2o;                               // R^2 for SECP256K1 order modular mult
+static uint64_t MM64o = 0x4B0DFF665588B13FULL; // 64bits lsb negative inverse of SECP256K1 order
+static Int *_O;                                // SECP256K1 order
 
 void Int::InitK1(Int *order) {
   _O = order;

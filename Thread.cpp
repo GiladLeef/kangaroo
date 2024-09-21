@@ -116,11 +116,11 @@ void Kangaroo::ProcessServer() {
     pthread_mutex_init(&ghMutex, NULL);
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    double t0 = Timer::get_tick();
+    double t0 = Timer::getTick();
     double lastSave = 0;
 
     while (!endOfSearch) {
-        double t1 = Timer::get_tick();
+        double t1 = Timer::getTick();
         LOCK(ghMutex);
         localCache.assign(recvDP.begin(), recvDP.end());
         recvDP.clear();
@@ -136,7 +136,7 @@ void Kangaroo::ProcessServer() {
             free(dp.dp);
         }
 
-        double elapsedTime = Timer::get_tick() - t1;
+        double elapsedTime = Timer::getTick() - t1;
         double toSleep = std::max(0.0, SEND_PERIOD - elapsedTime);
         Timer::SleepMillis(static_cast<uint32_t>(toSleep * 1000.0));
 
@@ -147,14 +147,14 @@ void Kangaroo::ProcessServer() {
                    log2((double)hashTable.GetNbItem()),
                    log2(expectedNbOp / pow(2.0, dpSize)),
                    (double)collisionInSameHerd,
-                   GetTimeStr(Timer::get_tick() - startTime).c_str(),
+                   GetTimeStr(Timer::getTick() - startTime).c_str(),
                    hashTable.GetSizeInfo().c_str());
         }
 
         if (!workFile.empty() && !endOfSearch) {
-            if ((Timer::get_tick() - lastSave) > saveWorkPeriod) {
+            if ((Timer::getTick() - lastSave) > saveWorkPeriod) {
                 SaveServerWork();
-                lastSave = Timer::get_tick();
+                lastSave = Timer::getTick();
             }
         }
     }
@@ -192,7 +192,7 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
   while(!hasStarted(params))
     Timer::SleepMillis(5);
 
-  t0 = Timer::get_tick();
+  t0 = Timer::getTick();
   startTime = t0;
   lastGPUCount = getGPUCount();
   lastCount = getCPUCount() + gpuCount;
@@ -208,7 +208,7 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
     gpuCount = getGPUCount();
     count = getCPUCount() + gpuCount;
 
-    t1 = Timer::get_tick();
+    t1 = Timer::getTick();
     keyRate = (double)(count - lastCount) / (t1 - t0);
     gpuKeyRate = (double)(gpuCount - lastGPUCount) / (t1 - t0);
     lastkeyRate[filterPos%FILTER_SIZE] = keyRate;
@@ -274,7 +274,7 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
   }
 
   count = getCPUCount() + getGPUCount();
-  t1 = Timer::get_tick();
+  t1 = Timer::getTick();
   
   if( !endOfSearch ) {
     printf("\r[%.2f %s][GPU %.2f %s][Cnt 2^%.2f][%s]  ",

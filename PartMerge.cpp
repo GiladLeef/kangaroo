@@ -15,7 +15,6 @@ using namespace std;
 namespace fs = std::filesystem;
 
 string Kangaroo::GetPartName(std::string& partName,int i,bool tmpPart) {
-
   char tmp[256];
   if(tmpPart)
     sprintf(tmp,"part%03d.tmp",i);
@@ -28,7 +27,6 @@ string Kangaroo::GetPartName(std::string& partName,int i,bool tmpPart) {
 }
 
 FILE * Kangaroo::OpenPart(std::string& partName,char *mode,int i,bool tmpPart) {
-
   string fName = GetPartName(partName,i,tmpPart);
   FILE* f = fopen(fName.c_str(),mode);
   if(f == NULL) {
@@ -87,7 +85,6 @@ void Kangaroo::CreateEmptyPartWork(std::string& partName) {
 }
 
 bool Kangaroo::MergePartition(TH_PARAM* p) {
-
   uint32_t part = p->hStart;
   string p1Name = string(p->part1Name);
   string p2Name = string(p->part2Name);
@@ -145,7 +142,6 @@ bool Kangaroo::MergePartition(TH_PARAM* p) {
 }
 extern void* _mergeThread(void* lpParam);
 
-
 void* _mergePartThread(void* lpParam) {
   TH_PARAM* p = (TH_PARAM*)lpParam;
   p->obj->MergePartition(p);
@@ -154,13 +150,12 @@ void* _mergePartThread(void* lpParam) {
 }
 
 bool Kangaroo::MergeWorkPartPart(std::string& part1Name,std::string& part2Name) {
-
   double t0;
   double t1;
   uint32_t v1;
   uint32_t v2;
 
-  t0 = Timer::get_tick();
+  t0 = Timer::getTick();
 
   string file1 = part1Name + "/header";
   bool partIsEmpty = IsEmpty(file1);
@@ -343,7 +338,7 @@ bool Kangaroo::MergeWorkPartPart(std::string& part1Name,std::string& part2Name) 
   free(params);
   free(thHandles);
 
-  t1 = Timer::get_tick();
+  t1 = Timer::getTick();
 
   if(!endOfSearch) {
 
@@ -366,7 +361,6 @@ bool Kangaroo::MergeWorkPartPart(std::string& part1Name,std::string& part2Name) 
 }
 
 bool Kangaroo::FillEmptyPartFromFile(std::string& partName,std::string& fileName,bool printStat) {
-
   double t0;
   double t1;
   uint32_t v1;
@@ -378,7 +372,7 @@ bool Kangaroo::FillEmptyPartFromFile(std::string& partName,std::string& fileName
   Int RS1;
   Int RE1;
 
-  t0 = Timer::get_tick();
+  t0 = Timer::getTick();
 
   FILE* f1 = ReadHeader(fileName,&v1,HEADW);
   if(f1 == NULL)
@@ -459,7 +453,7 @@ bool Kangaroo::FillEmptyPartFromFile(std::string& partName,std::string& fileName
   }
 
   ::fclose(f1);
-  t1 = Timer::get_tick();
+  t1 = Timer::getTick();
 
   ::printf("Done [2^%.3f DP][%s]\n",log2((double)nbDP),GetTimeStr(t1 - t0).c_str());
 
@@ -468,7 +462,6 @@ bool Kangaroo::FillEmptyPartFromFile(std::string& partName,std::string& fileName
 }
 
 bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool printStat) {
-
   double t0;
   double t1;
   uint32_t v1;
@@ -476,7 +469,7 @@ bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool print
 
   setvbuf(stdout,NULL,_IONBF,0);
 
-  t0 = Timer::get_tick();
+  t0 = Timer::getTick();
 
   string file1 = partName + "/header";
   if( IsEmpty(file1) ) 
@@ -579,7 +572,7 @@ bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool print
   InitRange();
   InitSearchKey();
 
-  t0 = Timer::get_tick();
+  t0 = Timer::getTick();
 
   ::printf("Merging");
 
@@ -649,8 +642,7 @@ bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool print
   }
 
   fclose(f2);
-
-  t1 = Timer::get_tick();
+  t1 = Timer::getTick();
 
   if(!endOfSearch) {
 
