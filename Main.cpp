@@ -45,68 +45,45 @@ void printUsage() {
 }
 
 int getInt(string name,char *v) {
-
   int r;
-
   try {
-
     r = std::stoi(string(v));
-
   } catch(std::invalid_argument&) {
-
     printf("Invalid %s argument, number expected\n",name.c_str());
     exit(-1);
-
   }
-
   return r;
-
 }
 
 double getDouble(string name,char *v) {
-
   double r;
-
   try {
-
     r = std::stod(string(v));
-
   } catch(std::invalid_argument&) {
-
     printf("Invalid %s argument, number expected\n",name.c_str());
     exit(-1);
-
   }
-
   return r;
-
 }
 
 void getInts(string name,vector<int> &tokens,const string &text,char sep) {
-
   size_t start = 0,end = 0;
   tokens.clear();
   int item;
-
+    
   try {
-
     while((end = text.find(sep,start)) != string::npos) {
       item = std::stoi(text.substr(start,end - start));
       tokens.push_back(item);
       start = end + 1;
     }
-
     item = std::stoi(text.substr(start));
     tokens.push_back(item);
-
   }
   catch(std::invalid_argument &) {
-
     printf("Invalid %s argument, number expected\n",name.c_str());
     exit(-1);
-
   }
-
 }
 
 // Default params
@@ -138,22 +115,17 @@ static string outputFile = "";
 static bool splitWorkFile = false;
 
 int main(int argc, char* argv[]) {
-
   printf("Kangaroo v" RELEASE "\n");
-
   // Global Init
   Timer::Init();
   rseed(Timer::getSeed32());
-
   // Init SECP256K1
   Secp256K1 *secp = new Secp256K1();
   secp->Init();
-
   int a = 1;
   nbCPUThread = Timer::getCoreNumber();
 
   while (a < argc) {
-
     if(strcmp(argv[a], "-t") == 0) {
       CHECKARG("-t",1);
       nbCPUThread = getInt("nbCPUThread",argv[a]);
@@ -268,7 +240,6 @@ int main(int argc, char* argv[]) {
       printf("Unexpected %s argument\n",argv[a]);
       exit(-1);
     }
-
   }
 
   if(gridSize.size() == 0) {
@@ -332,7 +303,5 @@ int main(int argc, char* argv[]) {
     else
       v->Run(nbCPUThread,gpuId,gridSize);
   }
-
   return 0;
-
 }
