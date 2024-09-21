@@ -33,9 +33,7 @@ FILE * Kangaroo::OpenPart(std::string& partName,char *mode,int i,bool tmpPart) {
     ::printf("OpenPart: Cannot open %s for mode %s\n",fName.c_str(),mode);
     ::printf("%s\n",::strerror(errno));
   }
-
   return f;
-
 }
 
 void Kangaroo::CreateEmptyPartWork(std::string& partName) {
@@ -140,6 +138,7 @@ bool Kangaroo::MergePartition(TH_PARAM* p) {
   return true;
 
 }
+
 extern void* _mergeThread(void* lpParam);
 
 void* _mergePartThread(void* lpParam) {
@@ -341,17 +340,13 @@ bool Kangaroo::MergeWorkPartPart(std::string& part1Name,std::string& part2Name) 
   t1 = Timer::getTick();
 
   if(!endOfSearch) {
-
     ::printf("Done [2^%.3f DP][%s]\n",log2((double)nbDP),GetTimeStr(t1 - t0).c_str());
-
+    
   } else {
-
     ::printf("Dead kangaroo: %" PRId64 "\n",collisionInSameHerd);
     ::printf("Total f1+f2: DP count 2^%.2f\n",log2((double)nbDP));
     return true;
-
   }
-
 
   ::printf("Dead kangaroo: %" PRId64 "\n",collisionInSameHerd);
   ::printf("Total f1+f2: DP count 2^%.2f\n",log2((double)nbDP));
@@ -364,7 +359,6 @@ bool Kangaroo::FillEmptyPartFromFile(std::string& partName,std::string& fileName
   double t0;
   double t1;
   uint32_t v1;
-
   uint32_t dp1;
   Point k1;
   uint64_t count1;
@@ -447,18 +441,14 @@ bool Kangaroo::FillEmptyPartFromFile(std::string& partName,std::string& fileName
       }
       nbDP += nbItem;
     }
-
     ::fclose(f);
-
   }
 
   ::fclose(f1);
   t1 = Timer::getTick();
-
   ::printf("Done [2^%.3f DP][%s]\n",log2((double)nbDP),GetTimeStr(t1 - t0).c_str());
-
+  
   return false;
-
 }
 
 bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool printStat) {
@@ -638,22 +628,18 @@ bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool print
     } else {
       remove(oldName.c_str());
     }
-
   }
 
   fclose(f2);
   t1 = Timer::getTick();
 
   if(!endOfSearch) {
-
     ::printf("Done [2^%.3f DP][%s]\n",log2((double)nbDP),GetTimeStr(t1 - t0).c_str());
 
   } else {
-
     ::printf("Dead kangaroo: %" PRId64 "\n",collisionInSameHerd);
     ::printf("Total f1+f2: DP count 2^%.2f\n",log2((double)nbDP));
     return true;
-
   }
 
   if(printStat) {
@@ -663,7 +649,5 @@ bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool print
     offsetTime = time1 + time2;
     offsetCount = count1 + count2;
   }
-
   return false;
-
 }
