@@ -224,7 +224,6 @@ void Int::ModInv() {
 }
 
 void Int::ModExp(Int *e) {
-
   Int base(this);
   SetInt32(1);
   uint32_t i = 0;
@@ -235,37 +234,29 @@ void Int::ModExp(Int *e) {
       ModMul(&base);
     base.ModMul(&base);
   }
-
 }
 
 void Int::ModMul(Int *a) {
-
   Int p;
   p.MontgomeryMult(a, this);
   MontgomeryMult(&_R2, &p);
-
 }
 
 void Int::ModSquare(Int *a) {
-
   Int p;
   p.MontgomeryMult(a, a);
   MontgomeryMult(&_R2, &p);
-
 }
 
 void Int::ModCube(Int *a) {
-
   Int p;
   Int p2;
   p.MontgomeryMult(a, a);
   p2.MontgomeryMult(&p, a);
   MontgomeryMult(&_R3, &p2);
-
 }
 
 bool Int::HasSqrt() {
-
   // Euler's criterion
   Int e(&_P);
   Int a(this);
@@ -274,7 +265,6 @@ bool Int::HasSqrt() {
   a.ModExp(&e);
 
   return a.IsOne();
-
 }
 
 void Int::ModSqrt() {
@@ -350,11 +340,9 @@ void Int::ModSqrt() {
 }
 
 void Int::ModMul(Int *a, Int *b) {
-
   Int p;
   p.MontgomeryMult(a,b);
   MontgomeryMult(&_R2,&p);
-
 }
 
 Int* Int::GetFieldCharacteristic() {
@@ -451,7 +439,6 @@ void Int::MontgomeryMult(Int *a) {
 
 
 void Int::MontgomeryMult(Int *a, Int *b) {
-
   // Compute a*b*R^-1 (mod n),  R=2^k (mod n), k = Msize*64
   // a and b must be lower than n
   // See SetupField()
@@ -482,14 +469,12 @@ void Int::MontgomeryMult(Int *a, Int *b) {
   p.Sub(this, &_P);
   if (p.IsPositive())
     Set(&p);
-
 }
 
 
 // SECP256K1 specific section
 
 void Int::ModMulK1(Int *a, Int *b) {
-
   unsigned char c;
 
   uint64_t ah, al;
@@ -537,11 +522,9 @@ void Int::ModMulK1(Int *a, Int *b) {
 
   // Probability of carry here or that this>P is very very unlikely
   bits64[4] = 0; 
-
 }
 
 void Int::ModMulK1(Int *a) {
-  
   unsigned char c;
   uint64_t ah, al;
   uint64_t t[NB64BLOCK];
@@ -587,7 +570,6 @@ void Int::ModMulK1(Int *a) {
   c = _addcarry_u64(c, r512[3], 0, bits64 + 3);
   // Probability of carry here or that this>P is very very unlikely
   bits64[4] = 0;
-
 }
 
 void Int::ModSquareK1(Int *a) {
@@ -819,7 +801,6 @@ uint32_t Int::ModPositiveK1() {
 
 
 void Int::ModMulK1order(Int *a) {
-
   Int t;
   Int pr;
   Int p;
@@ -873,5 +854,4 @@ void Int::ModMulK1order(Int *a) {
     Set(&p);
   else
     Set(&t);
-
 }
