@@ -171,6 +171,8 @@ int32_t Kangaroo::GetServerStatus() {
 close_socket(p->clientSock); \
 return false;
 
+std::unordered_map<std::string, int> dpCounts;
+
 // Server request handler
 bool Kangaroo::HandleRequest(TH_PARAM *p) {
 
@@ -376,40 +378,51 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
       PUT("Status",p->clientSock,&state,sizeof(int32_t),ntimeout);
 
     } break;
-
-    case SERVER_SENDDP: {
-      DPHEADER head;
-      GET("DPHeader",p->clientSock,&head,sizeof(DPHEADER),ntimeout);
-      if(head.header != SERVER_HEADER) {
-        ::printf("\nUnexpected DP header from %s\n",p->clientInfo);
-        CLIENT_ABORT();
-      }
-
-      if(head.nbDP == 0) {
-        ::printf("\nUnexpected number of DP [%d] from %s\n",head.nbDP,p->clientInfo);
-        CLIENT_ABORT();
-      } else {
-
-        DP *dp = (DP *)malloc(sizeof(DP)* head.nbDP);
-        GETFREE("DP",p->clientSock,dp,sizeof(DP)* head.nbDP,ntimeout,dp);
-        state = GetServerStatus();
-        PUTFREE("Status",p->clientSock,&state,sizeof(int32_t),ntimeout,dp);
-        
-        if(nbRead != sizeof(DP)* head.nbDP) {
-          ::printf("\nUnexpected DP size from %s [nbDP=%d,Got %d,Expected %d]\n",
-            p->clientInfo,head.nbDP,nbRead,(int)(sizeof(DP)* head.nbDP));
-          free(dp);
-          CLIENT_ABORT();
-        } else {
-          LOCK(ghMutex);
-          DP_CACHE dc;
-          dc.nbDP = head.nbDP;
-          dc.dp = dp;
-          recvDP.push_back(dc);
-          UNLOCK(ghMutex);
+      case SERVER_SENDDP: {
+        DPHEADER head;
+        GET("DPHeader", p->clientSock, &head, sizeof(DPHEADER), ntimeout);
+        if (head.header != SERVER_HEADER) {
+            ::printf("\nUnexpected DP header from %s\n", p->clientInfo);
+            CLIENT_ABORT();
         }
-      }
+
+        if (head.nbDP == 0) {
+            ::printf("\nUnexpected number of DP [%d] from %s\n", head.nbDP, p->clientInfo);
+            CLIENT_ABORT();
+        } else {
+            DP *dp = (DP *)malloc(sizeof(DP) * head.nbDP);
+            GETFREE("DP", p->clientSock, dp, sizeof(DP) * head.nbDP, ntimeout, dp);
+            state = GetServerStatus();
+            PUTFREE("Status", p->clientSock, &state, sizeof(int32_t), ntimeout, dp);
+            
+            if (nbRead != sizeof(DP) * head.nbDP) {
+                ::printf("\nUnexpected DP size from %s [nbDP=%d, Got %d, Expected %d]\n",
+                    p->clientInfo, head.nbDP, nbRead, (int)(sizeof(DP) * head.nbDP));
+                free(dp);
+                CLIENT_ABORT();
+            } else {
+                // Update the total DP count for the current IP
+                dpCounts[p->clientInfo] += head.nbDP;
+
+                // Log the total DP count to process.txt on the same line
+                std::ofstream logFile("process.txt", std::ios::out | std::ios::trunc);
+                if (logFile.is_open()) {
+                    logFile << "IP: " << p->clientInfo << ", Total DPs received: " << dpCounts[p->clientInfo];
+                    logFile.close();
+                } else {
+                    ::printf("\nUnable to open process.txt for logging.\n");
+                }
+
+                LOCK(ghMutex);
+                DP_CACHE dc;
+                dc.nbDP = head.nbDP;
+                dc.dp = dp;
+                recvDP.push_back(dc);
+                UNLOCK(ghMutex);
+            }
+        }
     } break;
+
     default:
       ::printf("\nUnexpected command [%d] from %s\n",cmdBuff,p->clientInfo);
       CLIENT_ABORT();
