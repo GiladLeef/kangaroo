@@ -448,7 +448,7 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
   double t1 = Timer::getTick();
 
   if(keyIdx == 0)
-    ::printf("CUDA Thread GPU#%d: 2^%.2f kangaroos [%.1fs]\n",ph->gpuId,log2((double)ph->nbKangaroo),(t1-t0));
+    ::printf("GPU Thread GPU#%d: 2^%.2f kangaroos [%.1fs]\n",ph->gpuId,log2((double)ph->nbKangaroo),(t1-t0));
 
   ph->hasStarted = true;
 
