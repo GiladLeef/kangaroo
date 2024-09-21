@@ -307,7 +307,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     }
 
     if (keyIdx == 0)
-        ::printf("Thread %d: %d kangaroos\n", ph->threadId, CPU_GRP_SIZE);
+        ::printf("CPU Thread %d: %d kangaroos\n", ph->threadId, CPU_GRP_SIZE);
 
     ph->hasStarted = true;
 
@@ -418,7 +418,7 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
   
   if( ph->px==NULL ) {
     if(keyIdx == 0)
-      ::printf("CUDA Thread GPU#%d: creating kangaroos...\n",ph->gpuId);
+      ::printf("GPU Thread GPU#%d: creating kangaroos...\n",ph->gpuId);
     // Create Kangaroos, if not already loaded
     uint64_t nbThread = gpu->GetNbThread();
     ph->px = new Int[ph->nbKangaroo];
