@@ -1,7 +1,6 @@
 #include "Point.h"
 
-Point::Point() {
-}
+Point::Point() {}
 
 Point::Point(const Point &p) {
   x.Set((Int *)&p.x);
@@ -32,8 +31,7 @@ void Point::Set(Int *cx, Int *cy,Int *cz) {
   z.Set(cz);
 }
 
-Point::~Point() {
-}
+Point::~Point() {}
 
 void Point::Set(Point &p) {
   x.Set(&p.x);
@@ -45,7 +43,6 @@ bool Point::isZero() {
 }
 
 void Point::Reduce() {
-
   Int i(&z);
   i.ModInv();
   x.ModMul(&x,&i);
@@ -59,11 +56,9 @@ bool Point::equals(Point &p) {
 }
 
 std::string Point::toString() {
-
   std::string ret;
   ret  = "X=" + x.GetBase16() + "\n";
   ret += "Y=" + y.GetBase16() + "\n";
   ret += "Z=" + z.GetBase16() + "\n";
   return ret;
-
 }
