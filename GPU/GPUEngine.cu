@@ -12,10 +12,8 @@
 #include "GPUCompute.h"
 
 __global__ void comp_kangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t *found,uint64_t dpMask) {
-
   int xPtr = (blockIdx.x*blockDim.x*GPU_GRP_SIZE) * KSIZE; // x[4] , y[4] , d[2], lastJump
   ComputeKangaroos(kangaroos + xPtr,maxFound,found,dpMask);
-
 }
 
 using namespace std;
