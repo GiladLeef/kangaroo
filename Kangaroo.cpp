@@ -412,11 +412,10 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
   gpu = new GPUEngine(ph->gridSizeX,ph->gridSizeY,ph->gpuId,65536 * 2);
 
   if(keyIdx == 0)
-    ::printf("GPU: %s (%.1f MB used)\n",gpu->deviceName.c_str(),gpu->GetMemory() / 1048576.0);
-
+    ::printf("%s (%.1f MB used)\n",gpu->deviceName.c_str(),gpu->GetMemory() / 1048576.0);
+  
   double t0 = Timer::getTick();
-
-
+  
   if( ph->px==NULL ) {
     if(keyIdx == 0)
       ::printf("CUDA Thread GPU#%d: creating kangaroos...\n",ph->gpuId);
@@ -434,7 +433,6 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
     }
   }
 
-
   gpu->SetWildOffset(&rangeWidthDiv2);
   gpu->SetParams(dMask,jumpDistance,jumpPointx,jumpPointy);
   gpu->SetKangaroos(ph->px,ph->py,ph->distance);
@@ -447,7 +445,6 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
   }
 
   gpu->callKernel();
-
   double t1 = Timer::getTick();
 
   if(keyIdx == 0)
@@ -474,15 +471,11 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
       }
 
     } else {
-
       if(gpuFound.size() > 0) {
-
         LOCK(ghMutex);
-
+        
         for(int g = 0; !endOfSearch && g < gpuFound.size(); g++) {
-
           uint32_t kType = (uint32_t)(gpuFound[g].kIdx % 2);
-
           if(!AddToTable(&gpuFound[g].x,&gpuFound[g].d,kType)) {
             // Collision inside the same herd
             // We need to reset the kangaroo
@@ -493,13 +486,10 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
             gpu->SetKangaroo(gpuFound[g].kIdx,&px,&py,&d);
             collisionInSameHerd++;
           }
-
         }
         UNLOCK(ghMutex);
       }
-
     }
-
     // Save request
     if(saveRequest && !endOfSearch) {
       // Get kangaroos
@@ -510,23 +500,17 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
       ph->isWaiting = false;
       UNLOCK(saveMutex);
     }
-
   }
-
 
   safe_delete_array(ph->px);
   safe_delete_array(ph->py);
   safe_delete_array(ph->distance);
   delete gpu;
-
+  
 #else
-
   ph->hasStarted = true;
-
 #endif
-
   ph->isRunning = false;
-
 }
 
 void *_SolveKeyCPU(void *lpParam) {
@@ -544,12 +528,11 @@ void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstTyp
     vector<Int> pk(nbKangaroo);
     vector<Point> S(nbKangaroo);
     vector<Point> Sp(nbKangaroo);
-
+  
     Point Z;
     Z.Clear();
-
     int offset = firstType % 2; // Calculate this once
-
+  
     if (lock) LOCK(ghMutex);
 
     for (int j = 0; j < nbKangaroo; j++) {
@@ -561,21 +544,16 @@ void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstTyp
             d[j].Rand(rangePower - 2);
             d[j].ModSubK1order(&rangeWidthDiv8);
         }
-
         pk[j] = d[j];
     }
 
     if (lock) UNLOCK(ghMutex);
-
     // Compute starting pos
     S = secp->ComputePublicKeys(pk);
-
     for (int j = 0; j < nbKangaroo; j++) {
         Sp[j] = ((j + offset) % 2 == TAME) ? Z : keyToSearch;
     }
-
     S = secp->AddDirect(Sp, S);
-
     for (int j = 0; j < nbKangaroo; j++) {
         px[j].Set(&S[j].x);
         py[j].Set(&S[j].y);
@@ -583,10 +561,7 @@ void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstTyp
 }
 
 void Kangaroo::CreateJumpTable() {
-
   int jumpBit = rangePower / 2 + 1;
-
-
   if(jumpBit > 128) jumpBit = 128;
   int maxRetry = 100;
   bool ok = false;
@@ -596,7 +571,6 @@ void Kangaroo::CreateJumpTable() {
   // Kangaroo jumps
   // Constant seed for compatibilty of workfiles
   rseed(0x600DCAFE);
-
 
   // Positive only
   // When using symmetry, the sign is switched by the symmetry class switch
@@ -628,42 +602,29 @@ void Kangaroo::CreateJumpTable() {
 }
 
 void Kangaroo::ComputeExpected(double dp,double *op,double *ram,double *overHead) {
-
   // Compute expected number of operation and memory
-
   double gainS = 1.0;
-
   // Kangaroo number
   double k = (double)totalRW;
-
   // Range size
   double N = pow(2.0,(double)rangePower);
-
   // theta
   double theta = pow(2.0,dp);
-
   // Z0
   double Z0 = (2.0 * (2.0 - sqrt(2.0)) * gainS) * sqrt(M_PI);
-
   // Average for DP = 0
   double avgDP0 = Z0 * sqrt(N);
-
   // DP Overhead
   *op = Z0 * pow(N * (k * theta + sqrt(N)),1.0 / 3.0);
-
   *ram = (double)sizeof(HASH_ENTRY) * (double)HASH_SIZE + // Table
          (double)sizeof(ENTRY *) * (double)(HASH_SIZE * 4) + // Allocation overhead
          (double)(sizeof(ENTRY) + sizeof(ENTRY *)) * (*op / theta); // Entries
-
   *ram /= (1024.0*1024.0);
-
   if(overHead)
     *overHead = *op/avgDP0;
-
 }
 
 void Kangaroo::InitRange() {
-
   rangeWidth.Set(&rangeEnd);
   rangeWidth.Sub(&rangeStart);
   rangePower = rangeWidth.GetBitLength();
@@ -674,11 +635,9 @@ void Kangaroo::InitRange() {
   rangeWidthDiv4.ShiftR(1);
   rangeWidthDiv8.Set(&rangeWidthDiv4);
   rangeWidthDiv8.ShiftR(1);
-
 }
 
 void Kangaroo::InitSearchKey() {
-
   Int SP;
   SP.Set(&rangeStart);
   if(!SP.IsZero()) {
@@ -690,32 +649,26 @@ void Kangaroo::InitSearchKey() {
   }
   keyToSearchNeg = keyToSearch;
   keyToSearchNeg.y.ModNeg();
-
 }
 
 void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize) {
     double t0 = Timer::getTick();
-
     nbCPUThread = nbThread;
   nbGPUThread = (useGpu ? (int)gpuId.size() : 0);
     totalRW = 0;
 #ifndef WITHGPU
-
   if(nbGPUThread>0) {
     ::printf("GPU code not compiled, use -DWITHGPU when compiling.\n");
     nbGPUThread = 0;
   }
-
 #endif
     uint64_t totalThread = (uint64_t)nbCPUThread + (uint64_t)nbGPUThread;
     if(totalThread == 0) {
       ::printf("No CPU or GPU thread, exiting.\n");
       ::exit(0);
     }
-
     TH_PARAM *params = (TH_PARAM *)malloc(totalThread * sizeof(TH_PARAM));
     THREAD_HANDLE *thHandles = (THREAD_HANDLE *)malloc(totalThread * sizeof(THREAD_HANDLE));
-
     memset(params, 0, totalThread * sizeof(TH_PARAM));
     memset(counters, 0, sizeof(counters));
     ::printf("Number of CPU threads: %d\n", nbCPUThread);
@@ -724,7 +677,6 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
   for(int i = 0; i < nbGPUThread; i++) {    
     int x = gridSize[2ULL * i];
     int y = gridSize[2ULL * i + 1ULL];
-        
     if(!GPUEngine::GetGridSize(gpuId[i],&x,&y)) {
       std::cout << "Failed to get grid size for GPU ID: " << gpuId[i] << std::endl;
       return;
@@ -732,14 +684,11 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
       params[nbCPUThread + i].gridSizeX = x;
       params[nbCPUThread + i].gridSizeY = y;
     }
-
     params[nbCPUThread + i].nbKangaroo = (uint64_t)GPU_GRP_SIZE * x * y;
     totalRW += params[nbCPUThread + i].nbKangaroo;
   }
 #endif
-
     totalRW += nbCPUThread * (uint64_t)CPU_GRP_SIZE;
-
     // Set starting parameters
     if (clientMode) {
         // Retrieve config from server
@@ -766,7 +715,6 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
             suggestedDP--;
             ComputeExpected((double)suggestedDP, &expectedNbOp, &expectedMem, &dpOverHead);
         }
-
         if (initDPSize < 0)
             initDPSize = suggestedDP;
 
@@ -780,9 +728,7 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
         keyIdx = 0;
         InitSearchKey();
     }
-
     SetDP(initDPSize);
-
     // Fetch kangaroos (if any)
     FectchKangaroos(params);
 
@@ -790,10 +736,8 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
             InitSearchKey();
             endOfSearch = false;
             collisionInSameHerd = 0;
-
             // Reset counters
             memset(counters, 0, sizeof(counters));
-
             // Launch CPU threads
             for (int i = 0; i < nbCPUThread; i++) {
                 params[i].threadId = i;
@@ -801,7 +745,6 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
                 thHandles[i] = LaunchThread(_SolveKeyCPU, params + i);
             }
             #ifdef WITHGPU
-
                   // Launch GPU threads
                   for(int i = 0; i < nbGPUThread; i++) {
                     int id = nbCPUThread + i;
@@ -812,14 +755,12 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
                   }
 
             #endif
-
             // Wait for end
             Process(params, "MK/s");
             JoinThreads(thHandles, nbCPUThread);
             FreeHandles(thHandles, nbCPUThread);
             hashTable.Reset();
     }
-
     double t1 = Timer::getTick();
     ::printf("\nDone: Total time %s \n", GetTimeStr(t1 - t0 + offsetTime).c_str());
 }
