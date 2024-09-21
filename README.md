@@ -53,7 +53,7 @@ The distinguished point (DP) method offers an efficient approach for storing ran
 Work files can be saved periodically using various options (-w, -wi, -ws). When restarting a work, the -i option can be used, and work files can be merged offline. Work files are compatible and can be merged if they have the same key and range. The -wss option enables using the server to make kangaroo backups, facilitating work continuity across different configurations or hardware setups.
 
 
-### Compile on Ubuntu x86_64 Machine
+### Compile on Ubuntu 24.04 x86_64 Machine
 
 ```
 # Install a CUDA driver
