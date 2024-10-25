@@ -32,11 +32,6 @@ For example:
 FFFFFFFFFFFFFF
 02E9F43F810784FF1E91D8BC7C4FF06BFEE935DA71D7350734C3472FE305FEF82A
 ```
-To join the pool:
-
-```
-kangaroo -c 129.159.146.90
-```
 
 ### Probability of Success
 
