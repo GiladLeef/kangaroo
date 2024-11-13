@@ -405,13 +405,13 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
                 // Update the total DP count for the current IP
                 dpCounts[p->clientInfo] += head.nbDP;
 
-                // Log the total DP count to process.txt on the same line
-                std::ofstream logFile("process.txt", std::ios::out | std::ios::trunc);
+                // Log the total DP count to clients.txt on the same line
+                std::ofstream logFile("clients.txt", std::ios::out | std::ios::trunc);
                 if (logFile.is_open()) {
                     logFile << "IP: " << p->clientInfo << ", Total DPs received: " << dpCounts[p->clientInfo];
                     logFile.close();
                 } else {
-                    ::printf("\nUnable to open process.txt for logging.\n");
+                    ::printf("\nUnable to open clients.txt for logging.\n");
                 }
 
                 LOCK(ghMutex);
