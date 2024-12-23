@@ -95,9 +95,10 @@ int main(int argc, char* argv[]) {
     bool gpuEnable = false, saveKangaroo = false, saveKangarooByServer = false, splitWorkFile = false, serverMode = false, checkFlag = false;
     string serverIP;
     double maxStep = 0.0;
-    int wtimeout = DEFAULT_TIMEOUT, ntimeout = DEFAULT_TIMEOUT, port = DEFAULT_PORT;
+    int dp = -1, wtimeout = DEFAULT_TIMEOUT, ntimeout = DEFAULT_TIMEOUT, port = DEFAULT_PORT;
     string configFile;
-
+    uint32_t savePeriod = 60;
+    
     // Parse arguments
     for (int a = 1; a < argc; ++a) {
         string arg = argv[a];
