@@ -212,35 +212,17 @@ static uint64_t inline _udiv128(uint64_t hi, uint64_t lo, uint64_t d,uint64_t *r
 
 #define __shiftright128(a,b,n) ((a)>>(n))|((b)<<(64-(n)))
 #define __shiftleft128(a,b,n) ((b)<<(n))|((a)>>(64-(n)))
+
 #ifdef __GNUC__
 
 #define _subborrow_u64(a,b,c,d) __builtin_ia32_sbb_u64(a,b,c,(long long unsigned int*)d);
 #define _addcarry_u64(a,b,c,d) __builtin_ia32_addcarryx_u64(a,b,c,(long long unsigned int*)d);
 
 #else
-static inline unsigned char _subborrow_u64(uint64_t a, uint64_t b, unsigned char c, long long unsigned int *d) {
-    unsigned char carry;
-    asm(
-        "sbbq %3, %0\n\t"
-        "setb %b1"
-        : "+r"(a), "=qm"(carry), "=r"(*d)
-        : "r"(b), "2"(c)
-        : "cc"
-    );
-    return a;
-}
 
-static inline unsigned char _addcarry_u64(uint64_t a, uint64_t b, unsigned char c, long long unsigned int *d) {
-    unsigned char carry;
-    __asm__(
-        "adcq %3, %0\n\t"
-        "setb %b1"
-        : "+r"(a), "=qm"(carry), "=r"(*d)
-        : "r"(b), "2"(c)
-        : "cc"
-    );
-    return a;
-}
+#define _subborrow_u64(a,b,c,d) __builtin_ia32_subborrow_u64(a,b,c,(long long unsigned int*)d);
+#define _addcarry_u64(a,b,c,d) __builtin_ia32_addcarryx_u64(a,b,c,(long long unsigned int*)d);
+
 #endif
 
 #define _byteswap_uint64 __builtin_bswap64
