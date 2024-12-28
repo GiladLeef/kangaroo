@@ -10,7 +10,7 @@ This program offers a powerful solution for tackling the Elliptic Curve Discrete
 - **Endomorphism optimization:** Comparing only the Y-coordinates enables finding a collision three times faster.
 - **Fast modular inversion:** Implements fast modular inversion using Delayed Right Shift 62 bits.
 - **Fast modular multiplication:** Utilizes 2 steps folding 512 bits to 256 bits reduction using 64-bit digits.
-- **Efficient HashTable Implementation:** State-of-the-art HashTable Implementation.
+- **Efficient HashTable Implementation:** State-of-the-art HashTable implementation.
 - **Multi-GPU support:** with CUDA optimisation via inline PTX assembly.
 - **Reduced code cycles:** Compared with the original version, this version reduces redundant code cycles.
 - **Native windows support:** The CPU version can be compiled directly with both gcc/clang on a windows machine.
