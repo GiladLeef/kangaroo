@@ -1,5 +1,7 @@
 ## Pollard's Kangaroo for SECP256K1
 
+The source code of this software can be found at https://github.com/giladleef/kangaroo.
+
 This program offers a powerful solution for tackling the Elliptic Curve Discrete Logarithm Problem (ECDLP) within the context of SECP256K1. Here's a detailed overview of the features and functionality of this solver:
 ### Features
 
