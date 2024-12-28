@@ -3,7 +3,7 @@
 This program offers a powerful solution for tackling the Elliptic Curve Discrete Logarithm Problem (ECDLP) within the context of SECP256K1. Here's a detailed overview of the features and functionality of this solver:
 ### Features
 
-- **256-bit, Fixed-size arithmetic:** Utilizes 256-bit, fixed-size arithmetic for efficient computation, which enables 254-bit search range.
+- **256-bit, Fixed-size arithmetic:** Utilizes 256-bit, fixed-size arithmetic for efficient computation.
 - **Endomorphism optimization:** Comparing only the Y-coordinates enables finding a collision three times faster.
 - **Fast modular inversion:** Implements fast modular inversion using Delayed Right Shift 62 bits.
 - **Fast modular multiplication:** Utilizes 2 steps folding 512 bits to 256 bits reduction using 64-bit digits.
