@@ -2,7 +2,7 @@
 #define CONSTANTSH
 
 // Release number
-#define RELEASE "1.1"
+#define RELEASE "2.0"
 
 // Kangaroo type
 #define TAME 0  // Tame kangaroo
