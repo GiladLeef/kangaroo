@@ -4,7 +4,7 @@ This program offers a powerful solution for tackling the Elliptic Curve Discrete
 ### Features
 
 - **256-bit, Fixed-size arithmetic:** Utilizes 256-bit, fixed-size arithmetic for efficient computation, which enables 254-bit search range.
-- **Endomorphism optimization:** We only compare the Y-coordinates of the points, so that a collision can be found three times faster.
+- **Endomorphism optimization:** Comparing only the Y-coordinates enables finding a collision three times faster.
 - **Fast modular inversion:** Implements fast modular inversion using Delayed Right Shift 62 bits.
 - **Fast modular multiplication:** Utilizes 2 steps folding 512 bits to 256 bits reduction using 64-bit digits.
 - **Multi-GPU support:** with CUDA optimisation via inline PTX assembly.
