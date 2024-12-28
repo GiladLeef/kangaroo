@@ -2,7 +2,7 @@
 #define CONSTANTSH
 
 // Release number
-#define RELEASE "1.0"
+#define RELEASE "2.0"
 
 // Number of random jumps
 #define NB_JUMP 32
