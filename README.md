@@ -4,7 +4,7 @@ This program offers a powerful solution for tackling the Elliptic Curve Discrete
 ### Features
 
 - **256-bit, Fixed-size arithmetic:** Utilizes 256-bit, fixed-size arithmetic for efficient computation.
-- **254-bit search range:** Since we use 256-bit integers, the search range extended to 254 bits. (two bits are used for flags).
+- **254-bit search range:** Since we use 256-bit integers, the search range extended to 254 bits. (2 bits are used for flags).
 - **Endomorphism optimization:** Comparing only the Y-coordinates enables finding a collision three times faster.
 - **Fast modular inversion:** Implements fast modular inversion using Delayed Right Shift 62 bits.
 - **Fast modular multiplication:** Utilizes 2 steps folding 512 bits to 256 bits reduction using 64-bit digits.
