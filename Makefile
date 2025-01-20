@@ -16,13 +16,19 @@ OBJET = $(addprefix $(OBJDIR)/, \
 # Ensure compiler is set, but skip for 'clean' target
 ifeq ($(compiler),)
   ifneq ($(MAKECMDGOALS),clean)
-    $(error You must specify the compiler: make compiler=g++ or make compiler=clang++)
+    $(error You must specify the compiler: make compiler=g++ or make compiler=clang++ or make compiler=icc)
   endif
 endif
 
 # Set the compiler to the specified one
 CXX = $(compiler)
 CXXFLAGS = -m64 -mssse3 -Wno-write-strings -Wno-unused-result -O3 -I.
+
+# Additional flags for Intel compiler
+ifeq ($(CXX), icx)
+  CXXFLAGS += -std=c++17 -D_GLIBCXX_USE_CXX11_ABI=1
+  LFLAGS += -lstdc++ -lstdc++fs -lpthread
+endif
 
 ifeq ($(OS),Windows_NT)
     LFLAGS = -lpthread -lws2_32
