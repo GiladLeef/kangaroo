@@ -34,7 +34,7 @@ endif
 # Additional flags for Intel compiler
 ifeq ($(CXX), icx)
   CXXFLAGS += -std=c++17 -D_GLIBCXX_USE_CXX11_ABI=1
-  LFLAGS += -L/opt/intel/oneapi/2025.0/lib -lstdc++ -lstdc++fs -lpthread
+  LFLAGS += -L/opt/intel/oneapi/2025.0/lib -lstdc++ -lstdc++fs
 endif
 
 $(OBJDIR)/%.o : %.cpp
