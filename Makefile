@@ -16,7 +16,7 @@ OBJET = $(addprefix $(OBJDIR)/, \
 # Ensure compiler is set, but skip for 'clean' target
 ifeq ($(compiler),)
   ifneq ($(MAKECMDGOALS),clean)
-    $(error You must specify the compiler: make compiler=g++ or make compiler=clang++ or make compiler=icc)
+    $(error You must specify the compiler: make compiler=g++ or make compiler=clang++ or make compiler=icx)
   endif
 endif
 
