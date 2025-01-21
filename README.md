@@ -13,7 +13,7 @@ This program offers a powerful solution for tackling the Elliptic Curve Discrete
 - **Efficient HashTable Implementation:** State-of-the-art HashTable implementation.
 - **Multi-GPU support:** with CUDA optimisation via inline PTX assembly.
 - **Reduced code cycles:** Compared with the original version, this version reduces redundant code cycles.
-- **Native windows support:** The CPU version can be compiled directly with both gcc/clang on a windows machine.
+- **Multiple platforms support:** The CPU version can be compiled directly with gcc/clang/intel oneAPI c++ on a linux machine. Windows supports only gcc/clang.
 
 This program is based on https://github.com/JeanLucPons/Kangaroo.
 ### How It Works
