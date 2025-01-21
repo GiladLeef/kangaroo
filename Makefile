@@ -24,16 +24,17 @@ endif
 CXX = $(compiler)
 CXXFLAGS = -m64 -mssse3 -Wno-write-strings -Wno-unused-result -O3 -I.
 
-# Additional flags for Intel compiler
-ifeq ($(CXX), icx)
-  CXXFLAGS += -std=c++17 -D_GLIBCXX_USE_CXX11_ABI=1
-  LFLAGS += -L/opt/intel/oneapi/2025.0/lib -lstdc++ -lstdc++fs -lpthread
-endif
 
 ifeq ($(OS),Windows_NT)
     LFLAGS = -lpthread -lws2_32
 else
     LFLAGS = -lpthread
+endif
+
+# Additional flags for Intel compiler
+ifeq ($(CXX), icx)
+  CXXFLAGS += -std=c++17 -D_GLIBCXX_USE_CXX11_ABI=1
+  LFLAGS += -L/opt/intel/oneapi/2025.0/lib -lstdc++ -lstdc++fs -lpthread
 endif
 
 $(OBJDIR)/%.o : %.cpp
