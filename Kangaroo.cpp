@@ -405,20 +405,26 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
 
 #ifdef WITHGPU
 
+  // Static array to track which GPUs have been initialized (max 256 GPUs)
+  static bool gpuInitialized[256] = {false};
   vector<ITEM> dps;
   vector<ITEM> gpuFound;
   GPUEngine *gpu;
 
   gpu = new GPUEngine(ph->gridSizeX,ph->gridSizeY,ph->gpuId,65536 * 2);
 
-  if(keyIdx == 0)
+  // Only print device information once per GPU ID
+  if(!gpuInitialized[ph->gpuId])
     ::printf("%s (%.1f MB used)\n",gpu->deviceName.c_str(),gpu->GetMemory() / 1048576.0);
   
   double t0 = Timer::getTick();
   
-  if( ph->px==NULL ) {
-    if(keyIdx == 0)
-      ::printf("GPU Thread GPU#%d: creating kangaroos...\n",ph->gpuId);
+  if(ph->px==NULL) {
+    // Only print creation message once per GPU ID
+    if(!gpuInitialized[ph->gpuId]) {
+      ::printf("GPU Thread GPU#%d: creating kangaroos...\n", ph->gpuId);
+      gpuInitialized[ph->gpuId] = true;
+    }
     // Create Kangaroos, if not already loaded
     uint64_t nbThread = gpu->GetNbThread();
     ph->px = new Int[ph->nbKangaroo];
@@ -447,7 +453,8 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
   gpu->callKernel();
   double t1 = Timer::getTick();
 
-  if(keyIdx == 0)
+  // Only print completion message once per GPU ID for the first key
+  if(keyIdx == 0 && !gpuInitialized[ph->gpuId])
     ::printf("GPU Thread GPU#%d: 2^%.2f kangaroos [%.1fs]\n",ph->gpuId,log2((double)ph->nbKangaroo),(t1-t0));
 
   ph->hasStarted = true;

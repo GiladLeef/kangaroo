@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "GPUEngine.h"
 #include <cuda.h>
@@ -492,11 +493,8 @@ bool GPUEngine::Launch(std::vector<ITEM> &hashFound,bool spinWait) {
   uint32_t nbFound = outputItemPinned[0];
   if(nbFound > maxFound) {
     // prefix has been lost
-    if(!lostWarning) {
-      printf("\nWarning, %d items lost\nHint: Search with less threads (-g) or increse dp (-d)\n",(nbFound - maxFound));
-      lostWarning = true;
-    }
-    nbFound = maxFound;
+    printf("\nError: %d items lost\nHint: Search with less threads (-g) or increase dp (-d)\n",(nbFound - maxFound));
+    exit(1);
   }
 
   // When can perform a standard copy, the kernel is eneded
