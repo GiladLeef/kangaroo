@@ -98,22 +98,24 @@ int HashTable::MergeH(uint32_t h, FILE* f1, FILE* f2, FILE* fd, uint32_t* nbDP, 
 
     std::vector<ENTRY> output(md);
     ENTRY e1, e2;
-    uint32_t pnb1 = nb1, pnb2 = nb2;
-    AV1();
-    AV2();
-
     bool end1 = (nb1 == 0), end2 = (nb2 == 0);
     bool collisionFound = false;
+    
+    // Read the first entries if available
+    if (!end1) fread(&e1, 32, 1, f1);
+    if (!end2) fread(&e2, 32, 1, f2);
 
+    // Merge the two sorted arrays in a single pass
     while (!(end1 && end2)) {
         if (!end1 && !end2) {
             int comp = compare(&e1.x, &e2.x);
             if (comp < 0) {
                 output[nbd++] = e1;
-                AV1();
-                --nb1;
+                end1 = (--nb1 == 0);
+                if (!end1) fread(&e1, 32, 1, f1);
             } else if (comp == 0) {
-                if((e1.d.i64[0] == e2.d.i64[0]) && (e1.d.i64[1] == e2.d.i64[1]) && (e1.d.i64[2] == e2.d.i64[2]) && (e1.d.i64[3] == e2.d.i64[3])) {
+                if((e1.d.i64[0] == e2.d.i64[0]) && (e1.d.i64[1] == e2.d.i64[1]) && 
+                   (e1.d.i64[2] == e2.d.i64[2]) && (e1.d.i64[3] == e2.d.i64[3])) {
                     ++(*duplicate);
                 } else {
                     CalcDistAndType(e1.d, d1, k1);
@@ -121,26 +123,40 @@ int HashTable::MergeH(uint32_t h, FILE* f1, FILE* f2, FILE* fd, uint32_t* nbDP, 
                     collisionFound = true;
                 }
                 output[nbd++] = e1;
-                AV1();
-                AV2();
-                --nb1;
-                --nb2;
+                
+                end1 = (--nb1 == 0);
+                end2 = (--nb2 == 0);
+                
+                if (!end1) fread(&e1, 32, 1, f1);
+                if (!end2) fread(&e2, 32, 1, f2);
             } else {
                 output[nbd++] = e2;
-                AV2();
-                --nb2;
+                end2 = (--nb2 == 0);
+                if (!end2) fread(&e2, 32, 1, f2);
             }
         } else if (!end1) {
-            output[nbd++] = e1;
-            AV1();
-            --nb1;
+            uint32_t remaining = nb1;
+            uint32_t batchSize = std::min(remaining, (uint32_t)1024);
+            
+            while (remaining > 0) {
+                batchSize = std::min(remaining, (uint32_t)1024);
+                fread(&output[nbd], 32, batchSize, f1);
+                nbd += batchSize;
+                remaining -= batchSize;
+            }
+            break;
         } else if (!end2) {
-            output[nbd++] = e2;
-            AV2();
-            --nb2;
+            uint32_t remaining = nb2;
+            uint32_t batchSize = std::min(remaining, (uint32_t)1024);
+            
+            while (remaining > 0) {
+                batchSize = std::min(remaining, (uint32_t)1024);
+                fread(&output[nbd], 32, batchSize, f2);
+                nbd += batchSize;
+                remaining -= batchSize;
+            }
+            break;
         }
-        end1 = (nb1 == 0);
-        end2 = (nb2 == 0);
     }
 
     md = (nbd + 3) / 4 * 4;
@@ -192,27 +208,48 @@ int HashTable::Add(uint64_t h, ENTRY* e) {
         E[h].maxItem = 1;
     }
 
-    // Traverse the linked list to check for duplicates
-    for (int i = 0; i < E[h].nbItem; i++) {
-        if (compare(&e->x, &GET(h, i)->x) == 0) {
-            if((e->d.i64[0] == GET(h,i)->d.i64[0]) && (e->d.i64[1] == GET(h,i)->d.i64[1]) && (e->d.i64[2] == GET(h,i)->d.i64[2]) && (e->d.i64[3] == GET(h,i)->d.i64[3]) ){
+    // Use binary search to find insertion point
+    int left = 0;
+    int right = E[h].nbItem - 1;
+    int mid;
+    int comp;
+    
+    while (left <= right) {
+        mid = left + (right - left) / 2;
+        comp = compare(&e->x, &GET(h, mid)->x);
+        
+        if (comp == 0) {
+            // Found a matching entry
+            if((e->d.i64[0] == GET(h,mid)->d.i64[0]) && (e->d.i64[1] == GET(h,mid)->d.i64[1]) && 
+               (e->d.i64[2] == GET(h,mid)->d.i64[2]) && (e->d.i64[3] == GET(h,mid)->d.i64[3])) {
                 return ADD_DUPLICATE;
             } else {
-                CalcDistAndType(GET(h, i)->d, &kDist, &kType);
+                CalcDistAndType(GET(h, mid)->d, &kDist, &kType);
                 return ADD_COLLISION;
             }
+        } else if (comp < 0) {
+            right = mid - 1;
+        } else {
+            left = mid + 1;
         }
     }
 
-    // If no duplicate is found, add the new entry to the end of the linked list
+    // Insertion point is at 'left'
     if (E[h].nbItem >= E[h].maxItem) {
         // Resize the linked list if necessary
         E[h].maxItem *= 2;
         E[h].items = (ENTRY **)realloc(E[h].items, sizeof(ENTRY *) * E[h].maxItem);
     }
 
-    // Add the new entry to the end of the linked list
-    E[h].items[E[h].nbItem++] = e;
+    // Shift elements to make room for the new entry
+    for (int i = E[h].nbItem; i > left; i--) {
+        E[h].items[i] = E[h].items[i - 1];
+    }
+    
+    // Insert the new entry at the correct position
+    E[h].items[left] = e;
+    E[h].nbItem++;
+    
     return ADD_OK;
 }
 

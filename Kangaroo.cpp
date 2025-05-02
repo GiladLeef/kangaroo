@@ -312,7 +312,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     ph->hasStarted = true;
 
     while (!endOfSearch) {
-        // Calculate jumps and initialize pointers
         for (int g = 0; g < CPU_GRP_SIZE; g++) {
             jmps[g] = ph->px[g].bits64[0] % NB_JUMP;
             p1xs[g] = &jumpPointx[jmps[g]];
@@ -323,6 +322,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             dx[g].ModSub(p2xs[g], p1xs[g]);
             isDPs[g] = IsDP(ph->px[g].bits64[3]);
         }
+        
         grp.Set(dx);
         grp.ModInv();
 
@@ -330,19 +330,23 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             dy.ModSub(p2ys[g], p1ys[g]);
             _s.ModMulK1(&dy, &dx[g]);
             _p.ModSquareK1(&_s);
+            
             rx.ModSub(&_p, p1xs[g]);
             rx.ModSub(p2xs[g]);
+            
+            // Compute new y coordinate
             ry.ModSub(p2xs[g], &rx);
             ry.ModMulK1(&_s);
             ry.ModSub(p2ys[g]);
 
-            // Update ph->px, ph->py directly to avoid Set()
+            // Update coordinates directly to avoid Set() overhead
             ph->px[g].Set(&rx);
             ph->py[g].Set(&ry);
-
+            
             // Update distance
             ph->distance[g].ModAddK1order(distances[g]);
 
+            // Store DP points for client mode in a batch
             if (clientMode && isDPs[g]) {
                 ITEM it;
                 it.x.Set(&ph->px[g]);
@@ -352,31 +356,32 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             }
         }
 
+        // Process results in batch operations
         if (clientMode) {
             double now = Timer::getTick();
-            if (now - lastSent > SEND_PERIOD) {
+            if (now - lastSent > SEND_PERIOD && !dps.empty()) {
                 LOCK(ghMutex);
                 // Send to server
-                SendToServer(dps,ph->threadId,0xFFFF);
+                SendToServer(dps, ph->threadId, 0xFFFF);
                 UNLOCK(ghMutex);
                 lastSent = now;
+                dps.clear(); // Clear the vector after sending
             }
             counters[thId] += CPU_GRP_SIZE;
         } else {
-            // Add to table and collision check
+            LOCK(ghMutex);
             for (int g = 0; g < CPU_GRP_SIZE; g++) {
-                if (isDPs[g]) {
-                    LOCK(ghMutex);
-                    if (!endOfSearch && !AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
+                if (isDPs[g] && !endOfSearch) {
+                    if (!AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
                         // Collision inside the same herd
                         // Reset the kangaroo
                         CreateHerd(1, &ph->px[g], &ph->py[g], &ph->distance[g], g % 2, false);
                         collisionInSameHerd++;
                     }
-                    UNLOCK(ghMutex);
                 }
                 counters[thId]++;
             }
+            UNLOCK(ghMutex);
         }
 
         // Save request
@@ -532,22 +537,24 @@ void *_SolveKeyGPU(void *lpParam) {
 }
 
 void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstType, bool lock) {
+    // Preallocate vectors with the exact size needed
     vector<Int> pk(nbKangaroo);
     vector<Point> S(nbKangaroo);
     vector<Point> Sp(nbKangaroo);
   
     Point Z;
     Z.Clear();
-    int offset = firstType % 2; // Calculate this once
-  
+    int offset = firstType % 2;
+    
     if (lock) LOCK(ghMutex);
 
+    const bool isTame = (offset % 2 == TAME);
     for (int j = 0; j < nbKangaroo; j++) {
         if ((j + offset) % 2 == TAME) {
-            // Tame in [0..N]
+            // Tame in [0..N] - use direct random generation
             d[j].Rand(rangePower);
         } else {
-            // Wild in [-N/8..N/8]
+            // Wild in [-N/8..N/8] - optimize calculation
             d[j].Rand(rangePower - 2);
             d[j].ModSubK1order(&rangeWidthDiv8);
         }
@@ -555,12 +562,15 @@ void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstTyp
     }
 
     if (lock) UNLOCK(ghMutex);
-    // Compute starting pos
+    
     S = secp->ComputePublicKeys(pk);
+    
     for (int j = 0; j < nbKangaroo; j++) {
         Sp[j] = ((j + offset) % 2 == TAME) ? Z : keyToSearch;
     }
+    
     S = secp->AddDirect(Sp, S);
+    
     for (int j = 0; j < nbKangaroo; j++) {
         px[j].Set(&S[j].x);
         py[j].Set(&S[j].y);
