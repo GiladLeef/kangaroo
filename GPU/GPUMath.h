@@ -93,15 +93,37 @@ USUBC(r[2],0ULL,r[2]); \
 USUBC(r[3],0ULL,r[3]); \
 USUB(r[4],0ULL,r[4]); }
 
-#define UMult(r, a, b) {\
-  UMULLO(r[0],a[0],b); \
-  UMULLO(r[1],a[1],b); \
-  MADDO(r[1], a[0],b,r[1]); \
-  UMULLO(r[2],a[2], b); \
-  MADDC(r[2], a[1], b, r[2]); \
-  UMULLO(r[3],a[3], b); \
-  MADDC(r[3], a[2], b, r[3]); \
-  MADD(r[4], a[3], b, 0ULL);}
+/* ------------------------------------------------------------------ */
+/* 256-bit × 64-bit → 320-bit multiply-and-accumulate with carry       */
+/* ------------------------------------------------------------------ */
+#if __CUDA_ARCH__ >= 700      /* Volta, Turing, Ampere, Hopper, … */
+/* 5-cycle, 5-instruction version – uses the 64-bit wide multiply
+   pipeline that first appeared in Volta (sm_70). */
+#define UMult(r, a, b)                                              \
+{                                                                   \
+    asm volatile (                                                  \
+        "{\n\t"                                                     \
+        "mul.wide.u64  %0,%5,%9;\n\t"    /* lo  = a0*b      */      \
+        "madc.wide.u64 %1,%6,%9,%0;\n\t" /* mid1= a1*b + c0 */      \
+        "madc.wide.u64 %2,%7,%9,%1;\n\t" /* mid2= a2*b + c1 */      \
+        "madc.wide.u64 %3,%8,%9,%2;\n\t" /* mid3= a3*b + c2 */      \
+        "madc.u64      %4, 0,  0,%3;\n\t" /* hi   = carry   */      \
+        "}"                                                         \
+        : "=&l"(r[0]), "=&l"(r[1]), "=&l"(r[2]),                    \
+          "=&l"(r[3]), "=&l"(r[4])                                  \
+        :  "l"(a[0]), "l"(a[1]), "l"(a[2]), "l"(a[3]), "l"(b));     \
+}
+#else                          /* Pascal (sm_60/61) fallback */
+/* 12-instruction sequence that every GPU supports */
+#define UMult(r, a, b)                                             \
+{                                                                  \
+    UMULLO(r[0],a[0],b);                                           \
+    UMULLO(r[1],a[1],b); MADDO(r[1],a[0],b,r[1]);                  \
+    UMULLO(r[2],a[2],b); MADDC(r[2],a[1],b,r[2]);                  \
+    UMULLO(r[3],a[3],b); MADDC(r[3],a[2],b,r[3]);                  \
+    MADD  (r[4],a[3],b,0ULL);                                      \
+}
+#endif
 
 #define Load(r, a) {\
   (r)[0] = (a)[0]; \
