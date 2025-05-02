@@ -298,27 +298,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     Int *distances[CPU_GRP_SIZE];
     bool isDPs[CPU_GRP_SIZE];
 
-    // Calculate batch size based on core count and DP value
-    // Formula: 2^(core_count) / DP
-    const int totalCores = nbCPUThread + nbGPUThread;
-    
-    // Calculate 2^totalCores
-    uint64_t powerOfCores = 1ULL << (totalCores > 30 ? 30 : totalCores); // Prevent overflow
-    
-    // Calculate batch size as 2^core_count / DP with a minimum of 1
-    int dpVal = dpSize < 1 ? 1 : (int)dpSize;
-    int BATCH_SIZE = (int)(powerOfCores / dpVal);
-    
-    // Apply limits
-    BATCH_SIZE = BATCH_SIZE < 1 ? 1 : BATCH_SIZE;
-    
-    // Maximum buffer allocation (will only use BATCH_SIZE elements)
-    Int* batchPx = new Int[BATCH_SIZE];
-    Int* batchPy = new Int[BATCH_SIZE];
-    Int* batchDist = new Int[BATCH_SIZE];
-    uint32_t* batchType = new uint32_t[BATCH_SIZE];
-    int batchCount = 0;
-
     // Create Kangaroos if not already loaded
     if (ph->px == nullptr) {
         ph->px = new Int[CPU_GRP_SIZE];
@@ -384,35 +363,17 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             }
             counters[thId] += CPU_GRP_SIZE;
         } else {
-            // Add to table and collision check (batch processing)
+            // Add to table and collision check
             for (int g = 0; g < CPU_GRP_SIZE; g++) {
                 if (isDPs[g]) {
-                    // Add to batch
-                    batchPx[batchCount].Set(&ph->px[g]);
-                    batchDist[batchCount].Set(&ph->distance[g]);
-                    batchType[batchCount] = g % 2;
-                    batchPy[batchCount].Set(&ph->py[g]); // Store y for potential reset
-                    batchCount++;
-                    
-                    // Process batch if it's full or this is the last distinguished point
-                    if (batchCount >= BATCH_SIZE || g == CPU_GRP_SIZE - 1) {
-                        LOCK(ghMutex);
-                        for (int b = 0; b < batchCount; b++) {
-                            if (!endOfSearch && !AddToTable(&batchPx[b], &batchDist[b], batchType[b])) {
-                                // Collision inside the same herd
-                                // Reset the kangaroo (find corresponding index in original array)
-                                for (int k = 0; k < CPU_GRP_SIZE; k++) {
-                                    if (ph->px[k].IsEqual(&batchPx[b]) && ph->py[k].IsEqual(&batchPy[b])) {
-                                        CreateHerd(1, &ph->px[k], &ph->py[k], &ph->distance[k], batchType[b], false);
-                                        break;
-                                    }
-                                }
-                                collisionInSameHerd++;
-                            }
-                        }
-                        UNLOCK(ghMutex);
-                        batchCount = 0;
+                    LOCK(ghMutex);
+                    if (!endOfSearch && !AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
+                        // Collision inside the same herd
+                        // Reset the kangaroo
+                        CreateHerd(1, &ph->px[g], &ph->py[g], &ph->distance[g], g % 2, false);
+                        collisionInSameHerd++;
                     }
+                    UNLOCK(ghMutex);
                 }
                 counters[thId]++;
             }
@@ -431,12 +392,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     safe_delete_array(ph->px);
     safe_delete_array(ph->py);
     safe_delete_array(ph->distance);
-
-    // Clean up batch arrays
-    delete[] batchPx;
-    delete[] batchPy;
-    delete[] batchDist;
-    delete[] batchType;
 
     ph->isRunning = false;
 }
