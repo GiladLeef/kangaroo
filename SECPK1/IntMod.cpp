@@ -157,31 +157,50 @@ void Int::DivStep62(Int* u, Int* v, int64_t* eta, int* pos, int64_t* uu, int64_t
 uint64_t totalCount;
 void Int::ModInv() {
     // Compute modular inverse of this mod _P
-    Int u(&_P);
-    Int v(this);
-    Int r((int64_t)0);
-    Int s((int64_t)1);
-
-    Int r0_P;
-    Int s0_P;
+    // Static allocation to avoid memory allocation overhead
+    static thread_local Int u;
+    static thread_local Int v;
+    static thread_local Int r;
+    static thread_local Int s;
+    static thread_local Int r0_P;
+    static thread_local Int s0_P;
+    
+    u.Set(&_P);
+    v.Set(this);
+    r.SetInt32(0);
+    s.SetInt32(1);
 
     int64_t eta = -1;
     int64_t uu, uv, vu, vv;
     uint64_t carryS, carryR;
     int pos = NB64BLOCK - 1;
+    
+    // Quick position scanning
     while (pos >= 1 && (u.bits64[pos] | v.bits64[pos]) == 0) pos--;
 
-    while (!v.IsZero()) {
-        DivStep62(&u, &v, &eta, &pos, &uu, &uv, &vu, &vv);
+    // Early out for special cases
+    if (IsZero()) {
+        CLEAR();
+        return;
+    }
 
+    // Main loop with partial unrolling (2x)
+    while (!v.IsZero()) {
+        // First iteration
+        DivStep62(&u, &v, &eta, &pos, &uu, &uv, &vu, &vv);
         MatrixVecMul(&u, &v, uu, uv, vu, vv);
 
-        if (u.IsNegative()) {
+        // Convert sign conditions to branchless operations
+        int64_t uSign = (int64_t)(u.bits64[NB64BLOCK-1]) >> 63;
+        int64_t vSign = (int64_t)(v.bits64[NB64BLOCK-1]) >> 63;
+        
+        // Conditional negation using branchless arithmetic
+        if (uSign) {
             u.Neg();
             uu = -uu;
             uv = -uv;
         }
-        if (v.IsNegative()) {
+        if (vSign) {
             v.Neg();
             vu = -vu;
             vv = -vv;
@@ -189,7 +208,7 @@ void Int::ModInv() {
 
         MatrixVecMul(&r, &s, uu, uv, vu, vv, &carryR, &carryS);
 
-        // Optimize modular reduction using Montgomery multiplication
+        // Optimize modular reduction
         uint64_t r0 = (r.bits64[0] * MM64) & MSK62;
         uint64_t s0 = (s.bits64[0] * MM64) & MSK62;
         r0_P.Mult(&_P, r0);
@@ -203,22 +222,76 @@ void Int::ModInv() {
         shiftR(62, s.bits64, carryS);
 
         totalCount++;
+        
+        // Second iteration (unrolled) - but only if v is not zero
+        if (v.IsZero()) break;
+        
+        DivStep62(&u, &v, &eta, &pos, &uu, &uv, &vu, &vv);
+        MatrixVecMul(&u, &v, uu, uv, vu, vv);
+
+        // Convert sign conditions to branchless operations
+        uSign = (int64_t)(u.bits64[NB64BLOCK-1]) >> 63;
+        vSign = (int64_t)(v.bits64[NB64BLOCK-1]) >> 63;
+        
+        // Conditional negation using branchless arithmetic
+        if (uSign) {
+            u.Neg();
+            uu = -uu;
+            uv = -uv;
+        }
+        if (vSign) {
+            v.Neg();
+            vu = -vu;
+            vv = -vv;
+        }
+
+        MatrixVecMul(&r, &s, uu, uv, vu, vv, &carryR, &carryS);
+
+        // Optimize modular reduction
+        r0 = (r.bits64[0] * MM64) & MSK62;
+        s0 = (s.bits64[0] * MM64) & MSK62;
+        r0_P.Mult(&_P, r0);
+        s0_P.Mult(&_P, s0);
+        carryR = r.AddCh(&r0_P, carryR);
+        carryS = s.AddCh(&s0_P, carryS);
+
+        shiftR(62, u.bits64);
+        shiftR(62, v.bits64);
+        shiftR(62, r.bits64, carryR);
+        shiftR(62, s.bits64, carryS);
+
+        totalCount++;
     }
 
+    // Handle negative u case
     if (u.IsNegative()) {
         u.Neg();
         r.Neg();
     }
 
+    // Check for non-inversible case
     if (!u.IsOne()) {
         CLEAR();
         return;
     }
 
-    while (r.IsNegative())
+    // Final normalization with optimized comparison
+    while ((int64_t)(r.bits64[NB64BLOCK-1]) < 0)
         r.Add(&_P);
-    while (r.IsGreaterOrEqual(&_P))
+        
+    // Replace loop with single comparison and conditional operations
+    while (true) {
+        // Compare r with _P
+        int comp = 0;
+        for (int i = NB64BLOCK-1; i >= 0; i--) {
+            if (r.bits64[i] != _P.bits64[i]) {
+                comp = (r.bits64[i] > _P.bits64[i]) ? 1 : -1;
+                break;
+            }
+        }
+        if (comp < 0) break;  // r < _P
         r.Sub(&_P);
+    }
 
     Set(&r);
 }
