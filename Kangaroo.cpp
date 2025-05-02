@@ -309,6 +309,10 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     int dpVal = dpSize < 1 ? 1 : (int)dpSize;
     int BATCH_SIZE = (int)(powerOfCores / dpVal);
     
+    // Apply limits
+    BATCH_SIZE = BATCH_SIZE < 1 ? 1 : BATCH_SIZE;
+    
+    // Maximum buffer allocation (will only use BATCH_SIZE elements)
     Int* batchPx = new Int[BATCH_SIZE];
     Int* batchPy = new Int[BATCH_SIZE];
     Int* batchDist = new Int[BATCH_SIZE];
@@ -391,8 +395,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
                     batchCount++;
                     
                     // Process batch if it's full or this is the last distinguished point
-                    if (batchCount >= BATCH_SIZE) {
-                        printf("Batch count: %d\n", batchCount);
+                    if (batchCount >= BATCH_SIZE || g == CPU_GRP_SIZE - 1) {
                         LOCK(ghMutex);
                         for (int b = 0; b < batchCount; b++) {
                             if (!endOfSearch && !AddToTable(&batchPx[b], &batchDist[b], batchType[b])) {
