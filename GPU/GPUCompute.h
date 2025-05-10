@@ -4,7 +4,7 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
 
   uint64_t px[GPU_GRP_SIZE][4];
   uint64_t py[GPU_GRP_SIZE][4];
-  uint64_t dist[GPU_GRP_SIZE][2];
+  uint64_t dist[GPU_GRP_SIZE][4];
   uint64_t dx[GPU_GRP_SIZE][4];
   uint64_t dy[4];
   uint64_t rx[4];
@@ -40,7 +40,7 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
       ModSub256(ry,py[g]);
       Load256(px[g],rx);
       Load256(py[g],ry);
-      Add128(dist[g],jD[jmp]);
+      Add256(dist[g],jD[jmp]);
       
       if((px[g][3] & dpMask) == 0) {
 

@@ -5,8 +5,8 @@
 #include "../Constants.h"
 #include "../SECPK1/SECP256k1.h"
 
-#define KSIZE 10
-#define ITEM_SIZE   56
+#define KSIZE 12
+#define ITEM_SIZE   76
 #define ITEM_SIZE32 (ITEM_SIZE/4)
 
 class GPUEngine {

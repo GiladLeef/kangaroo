@@ -579,7 +579,6 @@ void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstTyp
 
 void Kangaroo::CreateJumpTable() {
   int jumpBit = rangePower / 2 + 1;
-  if(jumpBit > 128) jumpBit = 128;
   int maxRetry = 100;
   bool ok = false;
   double distAvg;
