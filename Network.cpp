@@ -22,7 +22,7 @@ static SOCKET serverSock = 0;
 
 #define SERVER_HEADER 0x67DEDDC1
 
-#define KANG_PER_BLOCK 2048
+#define KANG_PER_BLOCK 1024
 
 // Commands
 #define SERVER_GETCONFIG 0
