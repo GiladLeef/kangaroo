@@ -11,8 +11,6 @@ This program offers a powerful solution for tackling the Elliptic Curve Discrete
 - **Fast modular inversion:** Implements fast modular inversion using Delayed Right Shift 62 bits.
 - **Fast modular multiplication:** Utilizes 2 steps folding 512 bits to 256 bits reduction using 64-bit digits.
 - **Multi-GPU support:** with CUDA optimisation via inline PTX assembly.
-- **Reduced code cycles:** Compared with the original version, this version reduces redundant code cycles.
-- **Native windows support:** The CPU version can be compiled directly with both gcc/clang on a windows machine.
 
 This program is based on https://github.com/JeanLucPons/Kangaroo.
 ### How It Works
