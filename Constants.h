@@ -12,10 +12,10 @@
 #define NB_JUMP 64 
 
 // GPU group size
-#define GPU_GRP_SIZE 256
+#define GPU_GRP_SIZE 128
 
 // GPU number of run per kernel call
-#define NB_RUN 128 
+#define NB_RUN 64
 
 // SendDP Period in sec
 #define SEND_PERIOD 2.0
