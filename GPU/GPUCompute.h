@@ -14,8 +14,6 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
   uint64_t backDist[GPU_GRP_SIZE][4];
   uint64_t _s[4];
   uint64_t _p[4];
-  uint64_t origPx[GPU_GRP_SIZE][4];
-  uint64_t origPy[GPU_GRP_SIZE][4];
   uint64_t origDist[GPU_GRP_SIZE][4];
   uint32_t jmp[GPU_GRP_SIZE];
 
@@ -32,9 +30,7 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
       jmp[g] = (uint32_t)px[g][0] & (NB_JUMP-1);
       ModSub256(dx[g],px[g],jPx[jmp[g]]);
       
-      // Save original point and distance
-      Load256(origPx[g],px[g]);
-      Load256(origPy[g],py[g]);
+      // Save original distance only (we don't need the points)
       Load256(origDist[g],dist[g]);
     }
     
