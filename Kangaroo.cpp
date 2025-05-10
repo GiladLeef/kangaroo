@@ -290,6 +290,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     IntGroup grp(CPU_GRP_SIZE);
     Int dx[CPU_GRP_SIZE];
     Int dy, rx, ry, _s, _p;
+    Int altRx, altRy; 
     uint64_t jmps[CPU_GRP_SIZE];
     Int *p1xs[CPU_GRP_SIZE];
     Int *p1ys[CPU_GRP_SIZE];
@@ -297,6 +298,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     Int *p2ys[CPU_GRP_SIZE];
     Int *distances[CPU_GRP_SIZE];
     bool isDPs[CPU_GRP_SIZE];
+    bool altIsDPs[CPU_GRP_SIZE];
 
     // Create Kangaroos if not already loaded
     if (ph->px == nullptr) {
@@ -331,28 +333,71 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             _s.ModMulK1(&dy, &dx[g]);
             _p.ModSquareK1(&_s);
             
+            // Forward jump point calculation
             rx.ModSub(&_p, p1xs[g]);
             rx.ModSub(p2xs[g]);
             
-            // Compute new y coordinate
             ry.ModSub(p2xs[g], &rx);
             ry.ModMulK1(&_s);
             ry.ModSub(p2ys[g]);
 
-            // Update coordinates directly to avoid Set() overhead
+            // Backward jump point calculation (cheap second-point trick)
+            altRx.ModSub(&_p, p1xs[g]);
+            altRx.ModSub(p2xs[g]);
+            altRx.ModNeg();
+            
+            altRy.ModSub(p2xs[g], &altRx);
+            altRy.ModMulK1(&_s);
+            altRy.ModSub(p2ys[g]);
+            altRy.ModNeg();
+            
+            // Store forward point
+            Int origPx = ph->px[g];
+            Int origPy = ph->py[g];
+            Int origDist = ph->distance[g];
+            
+            // Update forward point
             ph->px[g].Set(&rx);
             ph->py[g].Set(&ry);
-            
-            // Update distance
             ph->distance[g].ModAddK1order(distances[g]);
-
-            // Store DP points for client mode in a batch
+            
+            // Check if forward point is DP
+            isDPs[g] = IsDP(ph->px[g].bits64[3]);
+            
+            // Process the forward jump point
             if (clientMode && isDPs[g]) {
                 ITEM it;
                 it.x.Set(&ph->px[g]);
                 it.d.Set(&ph->distance[g]);
                 it.kIdx = g;
                 dps.push_back(it);
+            }
+            
+            // Check the backward jump point immediately
+            Int backPx, backPy, backDist;
+            backPx.Set(&altRx);
+            backPy.Set(&altRy);
+            backDist.Set(&origDist);
+            backDist.ModSubK1order(distances[g]); // Subtract for backward jump
+            
+            // Check if backward point is DP
+            altIsDPs[g] = IsDP(backPx.bits64[3]);
+            
+            // Process the backward jump point
+            if (clientMode && altIsDPs[g]) {
+                ITEM it;
+                it.x.Set(&backPx);
+                it.d.Set(&backDist);
+                it.kIdx = g;
+                dps.push_back(it);
+            } else if (!clientMode && altIsDPs[g] && !endOfSearch) {
+                LOCK(ghMutex);
+                if (!AddToTable(&backPx, &backDist, g % 2)) {
+                    // Collision inside the same herd, ignore for backward point
+                    collisionInSameHerd++;
+                }
+                UNLOCK(ghMutex);
+                counters[thId]++;
             }
         }
 
@@ -367,14 +412,14 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
                 lastSent = now;
                 dps.clear(); // Clear the vector after sending
             }
-            counters[thId] += CPU_GRP_SIZE;
+            counters[thId] += CPU_GRP_SIZE * 2; // Count both forward and backward checks
         } else {
             LOCK(ghMutex);
             for (int g = 0; g < CPU_GRP_SIZE; g++) {
                 if (isDPs[g] && !endOfSearch) {
                     if (!AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
                         // Collision inside the same herd
-                        // Reset the kangaroo
+                        // Reset the kangaroo for forward jump
                         CreateHerd(1, &ph->px[g], &ph->py[g], &ph->distance[g], g % 2, false);
                         collisionInSameHerd++;
                     }
@@ -467,7 +512,7 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
   while(!endOfSearch) {
 
     gpu->Launch(gpuFound);
-    counters[thId] += ph->nbKangaroo * NB_RUN;
+    counters[thId] += ph->nbKangaroo * NB_RUN * 2;  // Double count for second-point trick
 
     if( clientMode ) {
 
@@ -620,8 +665,8 @@ void Kangaroo::CreateJumpTable() {
 void Kangaroo::ComputeExpected(double dp,double *op,double *ram,double *overHead) {
   // Compute expected number of operation and memory
   double gainS = 1.0;
-  // Kangaroo number
-  double k = (double)totalRW;
+  // Kangaroo number - doubled due to second-point trick
+  double k = (double)totalRW * 2.0;
   // Range size
   double N = pow(2.0,(double)rangePower);
   // theta
@@ -718,7 +763,7 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
     InitRange();
     CreateJumpTable();
 
-    ::printf("Number of kangaroos: 2^%.2f\n", log2((double)totalRW));
+    ::printf("Number of kangaroos: 2^%.2f\n", log2((double)totalRW * 2.0));
 
     if (!clientMode) {
         // Compute suggested distinguished bits number for less than 5% overhead (see README)
