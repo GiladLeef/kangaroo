@@ -9,13 +9,13 @@
 #define WILD 1  // Wild kangaroo
 
 // Number of random jumps
-#define NB_JUMP 32 // Max 512 for the GPU
+#define NB_JUMP 64 
 
 // GPU group size
-#define GPU_GRP_SIZE 128
+#define GPU_GRP_SIZE 256
 
 // GPU number of run per kernel call
-#define NB_RUN 64
+#define NB_RUN 128 
 
 // SendDP Period in sec
 #define SEND_PERIOD 2.0

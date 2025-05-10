@@ -46,7 +46,7 @@ Kangaroo::Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,string &workFi
   this->splitWorkfile = splitWorkfile;
   this->pid = Timer::getPID();
 
-  CPU_GRP_SIZE = 1024;
+  CPU_GRP_SIZE = 2048;
 
   pthread_mutex_init(&ghMutex, NULL);
   pthread_mutex_init(&saveMutex, NULL);
@@ -290,7 +290,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     IntGroup grp(CPU_GRP_SIZE);
     Int dx[CPU_GRP_SIZE];
     Int dy, rx, ry, _s, _p;
-    Int altRx, altRy; 
+    Int altRx, altRy;
     uint64_t jmps[CPU_GRP_SIZE];
     Int *p1xs[CPU_GRP_SIZE];
     Int *p1ys[CPU_GRP_SIZE];
@@ -299,6 +299,13 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     Int *distances[CPU_GRP_SIZE];
     bool isDPs[CPU_GRP_SIZE];
     bool altIsDPs[CPU_GRP_SIZE];
+    
+    Int origPx[CPU_GRP_SIZE];
+    Int origPy[CPU_GRP_SIZE];
+    Int origDist[CPU_GRP_SIZE];
+    Int backPx[CPU_GRP_SIZE];
+    Int backPy[CPU_GRP_SIZE];
+    Int backDist[CPU_GRP_SIZE];
 
     // Create Kangaroos if not already loaded
     if (ph->px == nullptr) {
@@ -314,6 +321,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     ph->hasStarted = true;
 
     while (!endOfSearch) {
+        // First pass - collect data and calculate dx
         for (int g = 0; g < CPU_GRP_SIZE; g++) {
             jmps[g] = ph->px[g].bits64[0] % NB_JUMP;
             p1xs[g] = &jumpPointx[jmps[g]];
@@ -323,11 +331,18 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             distances[g] = &jumpDistance[jmps[g]];
             dx[g].ModSub(p2xs[g], p1xs[g]);
             isDPs[g] = IsDP(ph->px[g].bits64[3]);
+            
+            // Store original values for backward point calculation
+            origPx[g].Set(p2xs[g]);
+            origPy[g].Set(p2ys[g]);
+            origDist[g].Set(&ph->distance[g]);
         }
         
+        // Batch inversion - most expensive operation
         grp.Set(dx);
         grp.ModInv();
 
+        // Second pass - calculate both forward and backward points
         for (int g = 0; g < CPU_GRP_SIZE; g++) {
             dy.ModSub(p2ys[g], p1ys[g]);
             _s.ModMulK1(&dy, &dx[g]);
@@ -351,10 +366,12 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             altRy.ModSub(p2ys[g]);
             altRy.ModNeg();
             
-            // Store forward point
-            Int origPx = ph->px[g];
-            Int origPy = ph->py[g];
-            Int origDist = ph->distance[g];
+            // Store backward point data for batch processing later
+            backPx[g].Set(&altRx);
+            backPy[g].Set(&altRy);
+            backDist[g].Set(&origDist[g]);
+            backDist[g].ModSubK1order(distances[g]);
+            altIsDPs[g] = IsDP(backPx[g].bits64[3]);
             
             // Update forward point
             ph->px[g].Set(&rx);
@@ -363,69 +380,66 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             
             // Check if forward point is DP
             isDPs[g] = IsDP(ph->px[g].bits64[3]);
-            
-            // Process the forward jump point
-            if (clientMode && isDPs[g]) {
-                ITEM it;
-                it.x.Set(&ph->px[g]);
-                it.d.Set(&ph->distance[g]);
-                it.kIdx = g;
-                dps.push_back(it);
-            }
-            
-            // Check the backward jump point immediately
-            Int backPx, backPy, backDist;
-            backPx.Set(&altRx);
-            backPy.Set(&altRy);
-            backDist.Set(&origDist);
-            backDist.ModSubK1order(distances[g]); // Subtract for backward jump
-            
-            // Check if backward point is DP
-            altIsDPs[g] = IsDP(backPx.bits64[3]);
-            
-            // Process the backward jump point
-            if (clientMode && altIsDPs[g]) {
-                ITEM it;
-                it.x.Set(&backPx);
-                it.d.Set(&backDist);
-                it.kIdx = g;
-                dps.push_back(it);
-            } else if (!clientMode && altIsDPs[g] && !endOfSearch) {
-                LOCK(ghMutex);
-                if (!AddToTable(&backPx, &backDist, g % 2)) {
-                    // Collision inside the same herd, ignore for backward point
-                    collisionInSameHerd++;
-                }
-                UNLOCK(ghMutex);
-                counters[thId]++;
-            }
         }
-
-        // Process results in batch operations
+        
+        // Batch process results
         if (clientMode) {
+            // Process forward points
+            for (int g = 0; g < CPU_GRP_SIZE; g++) {
+                if (isDPs[g]) {
+                    ITEM it;
+                    it.x.Set(&ph->px[g]);
+                    it.d.Set(&ph->distance[g]);
+                    it.kIdx = g;
+                    dps.push_back(it);
+                }
+                
+                // Process backward points
+                if (altIsDPs[g]) {
+                    ITEM it;
+                    it.x.Set(&backPx[g]);
+                    it.d.Set(&backDist[g]);
+                    it.kIdx = g;
+                    dps.push_back(it);
+                }
+            }
+            
+            // Send data to server when appropriate
             double now = Timer::getTick();
             if (now - lastSent > SEND_PERIOD && !dps.empty()) {
                 LOCK(ghMutex);
-                // Send to server
                 SendToServer(dps, ph->threadId, 0xFFFF);
                 UNLOCK(ghMutex);
                 lastSent = now;
-                dps.clear(); // Clear the vector after sending
+                dps.clear();
             }
-            counters[thId] += CPU_GRP_SIZE * 2; // Count both forward and backward checks
+            
+            counters[thId] += CPU_GRP_SIZE * 2; // Count both forward and backward
         } else {
             LOCK(ghMutex);
-            for (int g = 0; g < CPU_GRP_SIZE; g++) {
-                if (isDPs[g] && !endOfSearch) {
+            
+            // Process both forward and backward points
+            for (int g = 0; g < CPU_GRP_SIZE && !endOfSearch; g++) {
+                // Process forward point
+                if (isDPs[g]) {
                     if (!AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
                         // Collision inside the same herd
-                        // Reset the kangaroo for forward jump
                         CreateHerd(1, &ph->px[g], &ph->py[g], &ph->distance[g], g % 2, false);
                         collisionInSameHerd++;
                     }
                 }
-                counters[thId]++;
+                
+                // Process backward point
+                if (altIsDPs[g]) {
+                    if (!AddToTable(&backPx[g], &backDist[g], g % 2)) {
+                        collisionInSameHerd++;
+                        // No need to reset the kangaroo for backward points
+                    }
+                }
+                
+                counters[thId] += 2; // Count both forward and backward checks
             }
+            
             UNLOCK(ghMutex);
         }
 
