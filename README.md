@@ -5,8 +5,7 @@ The source code of this software can be found at https://github.com/giladleef/ka
 This program offers a powerful solution for tackling the Elliptic Curve Discrete Logarithm Problem (ECDLP) within the context of SECP256K1. Here's a detailed overview of the features and functionality of this solver:
 ### Features
 
-- **256-bit, Fixed-size arithmetic:** Utilizes 4*64 bits, for fixed-size arithmetic for efficient computation.
-- **254-bit search range:** The search range extended to 254 bits. (2 bits are used for flags).
+- **254-bit search range:** The search range extended to 254 bits using fixed 256-bit arithmetic. (2 bits are used for flags).
 - **Endomorphism optimization:** Comparing only the Y-coordinates enables finding a collision three times faster.
 - **Fast modular inversion:** Implements fast modular inversion using Delayed Right Shift 62 bits.
 - **Fast modular multiplication:** Utilizes 2 steps folding 512 bits to 256 bits reduction using 64-bit digits.
