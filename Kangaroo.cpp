@@ -685,9 +685,7 @@ void Kangaroo::ComputeExpected(double dp,double *op,double *ram,double *overHead
   double N = pow(2.0,(double)rangePower);
   // theta
   double theta = pow(2.0,dp);
-  // Z0 - adjusted by factor of 2.83 (approx 2*sqrt(2)) to account for second-point trick efficiency
-  double Z0 = (2.0 * (2.0 - sqrt(2.0)) * gainS) * sqrt(M_PI) * 2.83;
-  // Average for DP = 0
+  double Z0 = (2.0 * (2.0 - sqrt(2.0)) * gainS) * sqrt(M_PI) * 1.42;
   double avgDP0 = Z0 * sqrt(N);
   // DP Overhead
   *op = Z0 * pow(N * (k * theta + sqrt(N)),1.0 / 3.0);
@@ -783,7 +781,7 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
         // Compute suggested distinguished bits number for less than 5% overhead (see README)
         double dpOverHead;
         // Adjust for the efficiency of the second-point trick
-        int suggestedDP = (int)((double)rangePower / 2.0 - log2((double)totalRW) - 1.5);
+        int suggestedDP = (int)((double)rangePower / 2.0 - log2((double)totalRW) - 1);
         if (suggestedDP < 0)
             suggestedDP = 0;
         ComputeExpected((double)suggestedDP, &expectedNbOp, &expectedMem, &dpOverHead);
