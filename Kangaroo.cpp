@@ -46,7 +46,7 @@ Kangaroo::Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,string &workFi
   this->splitWorkfile = splitWorkfile;
   this->pid = Timer::getPID();
 
-  CPU_GRP_SIZE = 2048;
+  CPU_GRP_SIZE = 1024;
 
   pthread_mutex_init(&ghMutex, NULL);
   pthread_mutex_init(&saveMutex, NULL);
@@ -679,14 +679,14 @@ void Kangaroo::CreateJumpTable() {
 void Kangaroo::ComputeExpected(double dp,double *op,double *ram,double *overHead) {
   // Compute expected number of operation and memory
   double gainS = 1.0;
-  // Kangaroo number - doubled due to second-point trick
-  double k = (double)totalRW * 2.0;
+  // Kangaroo number
+  double k = (double)totalRW;
   // Range size
   double N = pow(2.0,(double)rangePower);
   // theta
   double theta = pow(2.0,dp);
-  // Z0
-  double Z0 = (2.0 * (2.0 - sqrt(2.0)) * gainS) * sqrt(M_PI);
+  // Z0 - adjusted by factor of 2.83 (approx 2*sqrt(2)) to account for second-point trick efficiency
+  double Z0 = (2.0 * (2.0 - sqrt(2.0)) * gainS) * sqrt(M_PI) * 2.83;
   // Average for DP = 0
   double avgDP0 = Z0 * sqrt(N);
   // DP Overhead
@@ -777,12 +777,13 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
     InitRange();
     CreateJumpTable();
 
-    ::printf("Number of kangaroos: 2^%.2f\n", log2((double)totalRW * 2.0));
+    ::printf("Number of kangaroos: 2^%.2f\n", log2((double)totalRW));
 
     if (!clientMode) {
         // Compute suggested distinguished bits number for less than 5% overhead (see README)
         double dpOverHead;
-        int suggestedDP = (int)((double)rangePower / 2.0 - log2((double)totalRW));
+        // Adjust for the efficiency of the second-point trick
+        int suggestedDP = (int)((double)rangePower / 2.0 - log2((double)totalRW) - 1.5);
         if (suggestedDP < 0)
             suggestedDP = 0;
         ComputeExpected((double)suggestedDP, &expectedNbOp, &expectedMem, &dpOverHead);

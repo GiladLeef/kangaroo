@@ -128,7 +128,7 @@ void Kangaroo::ProcessServer() {
         if (!endOfSearch) {
             printf("\r[Client %d][Kang 2^%.2f][DP Count 2^%.2f/2^%.2f (%.2f%%)][Dead %.0f][%s][%s]  ",
                    connectedClient,
-                   log2((double)totalRW * 2.0), // Double for second-point trick
+                   log2((double)totalRW),
                    log2((double)hashTable.GetNbItem()),
                    log2(expectedNbOp / pow(2.0, dpSize)),
                    100.0 * (double)hashTable.GetNbItem() / (expectedNbOp / pow(2.0, dpSize)),
