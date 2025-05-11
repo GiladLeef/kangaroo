@@ -323,22 +323,19 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     while (!endOfSearch) {
         // First pass - collect data and calculate dx
         for (int g = 0; g < CPU_GRP_SIZE; g++) {
-            jmps[g] = ph->px[g].bits64[0] % NB_JUMP;
+            jmps[g] = ph->px[g].bits64[0] & (NB_JUMP - 1ULL);
+
             p1xs[g] = &jumpPointx[jmps[g]];
             p1ys[g] = &jumpPointy[jmps[g]];
             p2xs[g] = &ph->px[g];
             p2ys[g] = &ph->py[g];
             distances[g] = &jumpDistance[jmps[g]];
             dx[g].ModSub(p2xs[g], p1xs[g]);
-            isDPs[g] = IsDP(ph->px[g].bits64[3]);
-            
-            // Store original values for backward point calculation
-            origPx[g].Set(p2xs[g]);
-            origPy[g].Set(p2ys[g]);
+
             origDist[g].Set(&ph->distance[g]);
+            
         }
         
-        // Batch inversion - most expensive operation
         grp.Set(dx);
         grp.ModInv();
 
@@ -357,8 +354,8 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             ry.ModSub(p2ys[g]);
 
             // Backward jump point calculation (cheap second-point trick)
-            altRx.ModSub(&_p, p1xs[g]);
-            altRx.ModSub(p2xs[g]);
+            // Derive alternate X coordinate cheaply: altRx = -rx
+            altRx.Set(&rx);
             altRx.ModNeg();
             
             altRy.ModSub(p2xs[g], &altRx);
@@ -663,10 +660,23 @@ void Kangaroo::CreateJumpTable() {
     maxRetry--;
   }
 
+  // Batch computation of jump table using a single vector multi-scalar multiplication
+  // Build a vector of scalars that will be passed to the batched routine
+  std::vector<Int> scalars;
+  scalars.reserve(NB_JUMP);
+  for(int i = 0; i < NB_JUMP; ++i)
+    scalars.push_back(jumpDistance[i]);
+
+  // Compute all public keys at once – this path will internally take advantage of
+  // batching (ComputePublicKeys already uses a single batch inversion for the Z
+  // coordinates). Re-using it here avoids NB_JUMP individual scalar multiplications
+  // and prepares the ground for a future GPU off-load where the whole batch can be
+  // executed in a single kernel.
+  std::vector<Point> Jpoints = secp->ComputePublicKeys(scalars);
+
   for(int i = 0; i < NB_JUMP; ++i) {
-    Point J = secp->ComputePublicKey(&jumpDistance[i]);
-    jumpPointx[i].Set(&J.x);
-    jumpPointy[i].Set(&J.y);
+    jumpPointx[i].Set(&Jpoints[i].x);
+    jumpPointy[i].Set(&Jpoints[i].y);
   }
 
   ::printf("Jump average distance: 2^%.2f\n",log2(distAvg));
