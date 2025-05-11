@@ -38,16 +38,16 @@ CXX        = g++
 CUDA       = /usr/local/cuda
 CXXCUDA    = /usr/bin/g++
 NVCC       = $(CUDA)/bin/nvcc
-CXXFLAGS   =  -m64 -mssse3 -Wno-write-strings -Wno-unused-result -O3 -I.
+CXXFLAGS   =  -m64 -march=native -mtune=native -msse4.2 -mavx2 -ffast-math -funroll-loops -fomit-frame-pointer -flto -Wno-write-strings -Wno-unused-result -O3 -I.
 ifdef gpu
 
 
-CXXFLAGS   = -DWITHGPU -m64 -mssse3 -Wno-write-strings -Wno-unused-result -O3 -I. -I$(CUDA)/include
+CXXFLAGS   = -DWITHGPU -m64 -march=native -mtune=native -msse4.2 -mavx2 -ffast-math -funroll-loops -fomit-frame-pointer -flto -Wno-write-strings -Wno-unused-result -O3 -I. -I$(CUDA)/include
 LFLAGS     = -lpthread -L$(CUDA)/lib64 -lcudart
 
 else
 
-CXXFLAGS   = -m64 -mssse3 -Wno-write-strings -Wno-unused-result -O3 -I.
+CXXFLAGS   = -m64 -march=native -mtune=native -msse4.2 -mavx2 -ffast-math -funroll-loops -fomit-frame-pointer -flto -Wno-write-strings -Wno-unused-result -O3 -I.
 LFLAGS     = -lpthread
 
 endif
