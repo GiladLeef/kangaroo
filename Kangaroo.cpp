@@ -300,9 +300,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     bool isDPs[CPU_GRP_SIZE];
     bool altIsDPs[CPU_GRP_SIZE];
     
-    Int origPx[CPU_GRP_SIZE];
-    Int origPy[CPU_GRP_SIZE];
-    Int origDist[CPU_GRP_SIZE];
     Int backPx[CPU_GRP_SIZE];
     Int backPy[CPU_GRP_SIZE];
     Int backDist[CPU_GRP_SIZE];
@@ -331,9 +328,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             p2ys[g] = &ph->py[g];
             distances[g] = &jumpDistance[jmps[g]];
             dx[g].ModSub(p2xs[g], p1xs[g]);
-
-            origDist[g].Set(&ph->distance[g]);
-            
         }
         
         grp.Set(dx);
@@ -366,7 +360,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             // Store backward point data for batch processing later
             backPx[g].Set(&altRx);
             backPy[g].Set(&altRy);
-            backDist[g].Set(&origDist[g]);
+            backDist[g].Set(&ph->distance[g]);
             backDist[g].ModSubK1order(distances[g]);
             altIsDPs[g] = IsDP(backPx[g].bits64[3]);
             
