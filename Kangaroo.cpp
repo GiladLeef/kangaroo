@@ -587,11 +587,16 @@ void *_SolveKeyGPU(void *lpParam) {
 }
 
 void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstType, bool lock) {
-    // Preallocate vectors with the exact size needed
-    vector<Int> pk(nbKangaroo);
+    vector<Int>   pk(nbKangaroo);
     vector<Point> S(nbKangaroo);
-    vector<Point> Sp(nbKangaroo);
-  
+
+    // Only wild kangaroos need an extra addition with keyToSearch – collect their
+    // indices so we can batch them separately and avoid useless work for the
+    // tame half.
+    vector<int>   wildIdx;       wildIdx.reserve(nbKangaroo / 2 + 8);
+    vector<Point> wildS;         wildS.reserve(nbKangaroo / 2 + 8);
+    vector<Point> wildAdd;       wildAdd.reserve(nbKangaroo / 2 + 8);
+
     Point Z;
     Z.Clear();
     int offset = firstType % 2;
@@ -614,13 +619,23 @@ void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstTyp
     if (lock) UNLOCK(ghMutex);
     
     S = secp->ComputePublicKeys(pk);
-    
+
+    // Build the vectors that actually need the extra addition (wild only)
     for (int j = 0; j < nbKangaroo; j++) {
-        Sp[j] = ((j + offset) % 2 == TAME) ? Z : keyToSearch;
+        if ((j + offset) % 2 != TAME) {   // wild
+            wildIdx.push_back(j);
+            wildS.push_back(S[j]);
+            wildAdd.push_back(keyToSearch);
+        }
     }
-    
-    S = secp->AddDirect(Sp, S);
-    
+
+    if (!wildIdx.empty()) {
+        std::vector<Point> wildRes = secp->AddDirect(wildAdd, wildS);
+        // Copy the adjusted points back into the main S vector
+        for (size_t k = 0; k < wildIdx.size(); ++k)
+            S[wildIdx[k]] = wildRes[k];
+    }
+
     for (int j = 0; j < nbKangaroo; j++) {
         px[j].Set(&S[j].x);
         py[j].Set(&S[j].y);
