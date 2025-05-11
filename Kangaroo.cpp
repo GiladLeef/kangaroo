@@ -277,10 +277,26 @@ bool Kangaroo::AddToTable(uint64_t h,int256_t *x,int256_t *d) {
 
 }
 
-// Inline function for checking if a value is a DP
-inline bool IsDP(const uint64_t value) {
-    return (value & 0x01) == 0;
+// -----------------------------------------------------------------------------
+//  Performance fix: correct Distinguished-Point (DP) detection
+// -----------------------------------------------------------------------------
+//  The previous inline helper looked only at the least-significant bit of the
+//  X-coordinate word (`value & 0x01`).  When more than 1 DP bit is requested
+//  (the usual case: dpSize is often 16–22) this mis-classified *every other* point
+//  as distinguished.  The hash table and collision logic were therefore flooded
+//  with ~65 000× too many entries, dramatically slowing the search.
+//
+//  We now check against the actual mask chosen by SetDP() – held in `dMask` –
+//  and hoist that constant outside the inner loop so the check is still a
+//  single `and ; test` instruction per kangaroo.
+
+//  Helper (anonymous namespace) so it can still be inlined aggressively.
+namespace {
+inline bool isDP(uint64_t highWord, uint64_t mask) {
+    return (highWord & mask) == 0ULL;
 }
+} // anonymous namespace
+
 void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     vector<ITEM> dps;
     int thId = ph->threadId;
@@ -362,7 +378,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             backPy[g].Set(&altRy);
             backDist[g].Set(&ph->distance[g]);
             backDist[g].ModSubK1order(distances[g]);
-            altIsDPs[g] = IsDP(backPx[g].bits64[3]);
+            altIsDPs[g] = isDP(backPx[g].bits64[3], dMask);
             
             // Update forward point
             ph->px[g].Set(&rx);
@@ -370,7 +386,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             ph->distance[g].ModAddK1order(distances[g]);
             
             // Check if forward point is DP
-            isDPs[g] = IsDP(ph->px[g].bits64[3]);
+            isDPs[g] = isDP(ph->px[g].bits64[3], dMask);
         }
         
         // Batch process results
