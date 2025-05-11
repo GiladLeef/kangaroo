@@ -277,10 +277,6 @@ bool Kangaroo::AddToTable(uint64_t h,int256_t *x,int256_t *d) {
 
 }
 
-// Inline function for checking if a value is a DP
-inline bool IsDP(const uint64_t value) {
-    return (value & 0x01) == 0;
-}
 void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     vector<ITEM> dps;
     int thId = ph->threadId;
