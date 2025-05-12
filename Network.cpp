@@ -8,6 +8,8 @@
 #include <signal.h>
 #include <pthread.h>
 #include <unordered_map>
+#include <regex>
+#include <chrono>
 
 using namespace std;
 
@@ -32,6 +34,7 @@ static SOCKET serverSock = 0;
 #define SERVER_SAVEKANG  4
 #define SERVER_LOADKANG  5
 #define SERVER_RESETDEAD  'R'
+#define SERVER_GETPOOLSTATS 'P'
 
 // Status
 #define SERVER_OK            0
@@ -152,6 +155,96 @@ int Kangaroo::Read(SOCKET sock,char *buf,int bufsize,int timeout) { // Timeout i
   return total_read;
 }
 
+// Check if string is a valid Bitcoin P2PK address
+bool Kangaroo::IsValidBitcoinAddress(const std::string& address) {
+  // Simple regex check for P2PK format (starting with '1')
+  std::regex p2pkRegex("^1[a-zA-Z0-9]{25,34}$");
+  return std::regex_match(address, p2pkRegex);
+}
+
+// Update client statistics for pool mode
+void Kangaroo::UpdateClientStats(const std::string& address, uint32_t dpCount, const std::string& clientInfo) {
+  LOCK(poolStatsMutex);
+  
+  auto now = std::chrono::system_clock::now();
+  auto timestamp = std::chrono::system_clock::to_time_t(now);
+  
+  if (clientStats.find(address) == clientStats.end()) {
+    // New client
+    CLIENT_STATS stats;
+    stats.address = address;
+    stats.dpCount = dpCount;
+    stats.lastSeen = timestamp;
+    stats.clientInfo = clientInfo;
+    clientStats[address] = stats;
+  } else {
+    // Update existing client
+    clientStats[address].dpCount += dpCount;
+    clientStats[address].lastSeen = timestamp;
+    clientStats[address].clientInfo = clientInfo;
+  }
+  
+  totalPoolDP += dpCount;
+  
+  // Save stats to file periodically
+  SavePoolStats();
+  
+  UNLOCK(poolStatsMutex);
+}
+
+// Get a copy of the client stats for the UI
+std::unordered_map<std::string, CLIENT_STATS> Kangaroo::GetClientStats() {
+  LOCK(poolStatsMutex);
+  auto stats = clientStats;
+  UNLOCK(poolStatsMutex);
+  return stats;
+}
+
+// Get total DP count for the pool
+uint64_t Kangaroo::GetTotalDP() {
+  LOCK(poolStatsMutex);
+  auto total = totalPoolDP;
+  UNLOCK(poolStatsMutex);
+  return total;
+}
+
+// Save pool statistics to a JSON file
+bool Kangaroo::SavePoolStats() {
+  std::ofstream statsFile("poolstats.json");
+  if (!statsFile.is_open()) {
+    ::printf("\nCannot open poolstats.json for writing\n");
+    return false;
+  }
+  
+  statsFile << "{\n";
+  statsFile << "  \"totalDP\": " << totalPoolDP << ",\n";
+  statsFile << "  \"clients\": [\n";
+  
+  bool first = true;
+  for (const auto& client : clientStats) {
+    if (!first) {
+      statsFile << ",\n";
+    }
+    first = false;
+    
+    time_t lastSeen = client.second.lastSeen;
+    char timeBuffer[30];
+    std::strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", std::localtime(&lastSeen));
+    
+    statsFile << "    {\n";
+    statsFile << "      \"address\": \"" << client.second.address << "\",\n";
+    statsFile << "      \"dpCount\": " << client.second.dpCount << ",\n";
+    statsFile << "      \"lastSeen\": \"" << timeBuffer << "\",\n";
+    statsFile << "      \"clientInfo\": \"" << client.second.clientInfo << "\",\n";
+    statsFile << "      \"percentage\": " << (totalPoolDP > 0 ? (double)client.second.dpCount / totalPoolDP * 100.0 : 0.0) << "\n";
+    statsFile << "    }";
+  }
+  
+  statsFile << "\n  ]\n}";
+  statsFile.close();
+  return true;
+}
+
 // ------------------------------------------------------------------------------------------------------
 // Server code
 // ------------------------------------------------------------------------------------------------------
@@ -172,7 +265,355 @@ int32_t Kangaroo::GetServerStatus() {
 close_socket(p->clientSock); \
 return false;
 
-std::unordered_map<std::string, int> dpCounts;
+
+// Server request handler for pool mode
+bool Kangaroo::HandlePoolRequest(TH_PARAM *p) {
+  char cmdBuff;
+  uint32_t version = SERVER_VERSION;
+  int nbRead;
+  int nbWrite;
+  int32_t state;
+  
+  // For pool mode, we need to get the Bitcoin address first
+  uint32_t addrLength;
+  char bitcoinAddress[128];
+  
+  GET("AddressLength", p->clientSock, &addrLength, sizeof(uint32_t), ntimeout);
+  
+  if (addrLength >= 128) {
+    ::printf("\nBitcoin address too long (MAX=127) from %s\n", p->clientInfo);
+    CLIENT_ABORT();
+  }
+  
+  GET("BitcoinAddress", p->clientSock, &bitcoinAddress, addrLength, ntimeout);
+  bitcoinAddress[addrLength] = 0;
+  
+  // Verify the Bitcoin address
+  if (!IsValidBitcoinAddress(bitcoinAddress)) {
+    ::printf("\nInvalid Bitcoin address '%s' from %s\n", bitcoinAddress, p->clientInfo);
+    CLIENT_ABORT();
+  }
+  
+  // Store the Bitcoin address
+  p->bitcoinAddress = strdup(bitcoinAddress);
+  ::printf("\nNew pool connection from %s with address %s\n", p->clientInfo, p->bitcoinAddress);
+  
+  while (p->isRunning) {
+    // Wait for command (1h timeout)
+    nbRead = Read(p->clientSock, (char *)(&cmdBuff), 1, (int)(CLIENT_TIMEOUT*1000.0));
+    if (nbRead <= 0) {
+      CLIENT_ABORT();
+    }
+    
+    switch (cmdBuff) {
+      case SERVER_GETCONFIG: {
+        // Send config to the client
+        PUT("Version", p->clientSock, &version, sizeof(uint32_t), ntimeout);
+        PUT("RangeStart", p->clientSock, rangeStart.bits64, 32, ntimeout);
+        PUT("RangeEnd", p->clientSock, rangeEnd.bits64, 32, ntimeout);
+        PUT("KeyX", p->clientSock, keysToSearch[keyIdx].x.bits64, 32, ntimeout);
+        PUT("KeyY", p->clientSock, keysToSearch[keyIdx].y.bits64, 32, ntimeout);
+        PUT("DP", p->clientSock, &initDPSize, sizeof(int32_t), ntimeout);
+      } break;
+
+      case SERVER_SETKNB: {
+        GET("nbKangaroo", p->clientSock, &p->nbKangaroo, sizeof(uint64_t), ntimeout);
+        totalRW += p->nbKangaroo;
+      } break;
+      
+      case SERVER_RESETDEAD: {
+        char response[5];
+        collisionInSameHerd = 0;
+        GET("flush", p->clientSock, &response, 2, ntimeout);
+        sprintf(response, "OK\n");
+        PUT("resp", p->clientSock, &response, 3, ntimeout);
+      } break;
+
+      case SERVER_LOADKANG: {
+        Int checkSum;
+        Int K;
+        uint64_t nbKangaroo = 0;
+        uint32_t strSize;
+        char fileName[256];
+        int256_t* KBuff;
+        uint32_t nbK;
+        uint32_t header = HEADKS;
+        uint32_t version = 0;
+
+        GET("fileNameLenght", p->clientSock, &strSize, sizeof(uint32_t), ntimeout);
+        if (strSize >= 256) {
+          ::printf("\nFileName too long (MAX=256) %s\n", p->clientInfo);
+          CLIENT_ABORT();
+        }
+
+        GET("fileName", p->clientSock, &fileName, strSize, ntimeout);
+        fileName[strSize] = 0;
+        FILE* f = fopen(fileName, "rb");
+        if (f == NULL) {
+          // No backup
+          ::printf("LoadKang: Cannot open %s for reading\n", fileName);
+          ::printf("%s\n", ::strerror(errno));
+          PUT("nbKangaroo", p->clientSock, &nbKangaroo, sizeof(uint64_t), ntimeout);
+          break;
+        }
+
+        if (::fread(&header, sizeof(uint32_t), 1, f) != 1) {
+          ::printf("LoadKang: Cannot read from %s\n", fileName);
+          ::printf("%s\n", ::strerror(errno));
+          ::fclose(f);
+          CLIENT_ABORT();
+        }
+
+        if (header != HEADKS) {
+          ::printf("LoadKang: %s Not a compressed kangaroo file\n", fileName);
+          ::printf("%s\n", ::strerror(errno));
+          ::fclose(f);
+          CLIENT_ABORT();
+        }
+
+        ::fread(&version, sizeof(uint32_t), 1, f);
+        ::fread(&nbKangaroo, sizeof(uint64_t), 1, f);
+
+        PUT("nbKangaroo", p->clientSock, &nbKangaroo, sizeof(uint64_t), ntimeout);
+
+        checkSum.SetInt32(0);
+        KBuff = (int256_t*)malloc(KANG_PER_BLOCK * sizeof(int256_t));
+
+        while (nbKangaroo > 0) {
+          if (nbKangaroo > KANG_PER_BLOCK) {
+            nbK = KANG_PER_BLOCK;
+          } else {
+            nbK = (uint32_t)nbKangaroo;
+          }
+
+          for (uint32_t k = 0; k < nbK; k++) {
+            ::fread(&KBuff[k], 16, 1, f);
+            // Checksum
+            K.SetInt32(0);
+            K.bits64[3] = KBuff[k].i64[3];
+            K.bits64[2] = KBuff[k].i64[2];
+            K.bits64[1] = KBuff[k].i64[1];
+            K.bits64[0] = KBuff[k].i64[0];
+            checkSum.Add(&K);
+          }
+
+          PUTFREE("packet", p->clientSock, KBuff, nbK * 16, ntimeout, KBuff);
+          nbKangaroo -= nbK;
+        }
+        free(KBuff);
+        PUT("checkSum", p->clientSock, checkSum.bits64, 32, ntimeout);
+        ::fclose(f);
+      } break;
+
+      case SERVER_SAVEKANG: {
+        Int checkSum;
+        Int K;
+        uint64_t nbKangaroo;
+        uint32_t fileNameSize;
+        char fileNameTmp[264];
+        char fileName[256];
+        int256_t *KBuff;
+        uint32_t nbK;
+        uint32_t header = HEADKS;
+        uint32_t version = 0;
+
+        GET("fileNameLenght", p->clientSock, &fileNameSize, sizeof(uint32_t), ntimeout);
+        if (fileNameSize >= 256) {
+          ::printf("\nFileName too long (MAX=256) %s\n", p->clientInfo);
+          CLIENT_ABORT();
+        }
+
+        GET("fileName", p->clientSock, &fileName, fileNameSize, ntimeout);
+        fileName[fileNameSize] = 0;
+        GET("nbKangaroo", p->clientSock, &nbKangaroo, sizeof(uint64_t), ntimeout);
+
+        strcpy(fileNameTmp, fileName);
+        strcat(fileNameTmp, ".tmp");
+
+        FILE* f = fopen(fileNameTmp, "wb");
+        if (f == NULL) {
+          ::printf("\nCannot open %s for writing\n", fileNameTmp);
+          ::printf("%s\n", ::strerror(errno));
+          CLIENT_ABORT();
+        }
+
+        if (::fwrite(&header, sizeof(uint32_t), 1, f) != 1) {
+          ::printf("\nCannot write to %s\n", fileNameTmp);
+          ::printf("%s\n", ::strerror(errno));
+          ::fclose(f);
+          CLIENT_ABORT();
+        }
+        ::fwrite(&version, sizeof(uint32_t), 1, f);
+        ::fwrite(&nbKangaroo, sizeof(uint64_t), 1, f);
+        
+        checkSum.SetInt32(0);
+        KBuff = (int256_t *)malloc(KANG_PER_BLOCK*sizeof(int256_t));
+        
+        while (nbKangaroo > 0) {
+          if (nbKangaroo > KANG_PER_BLOCK) {
+            nbK = KANG_PER_BLOCK;
+          } else {
+            nbK = (uint32_t)nbKangaroo;
+          }
+
+          GETFREE("packet", p->clientSock, KBuff, nbK * 16, ntimeout, KBuff);
+          
+          for (uint32_t k = 0; k < nbK; k++) {
+            ::fwrite(&KBuff[k], 16, 1, f);
+            // Checksum
+            K.SetInt32(0);
+            K.bits64[3] = KBuff[k].i64[3];
+            K.bits64[2] = KBuff[k].i64[2];
+            K.bits64[1] = KBuff[k].i64[1];
+            K.bits64[0] = KBuff[k].i64[0];
+            checkSum.Add(&K);
+          }
+          nbKangaroo -= nbK;
+        }
+
+        free(KBuff);
+        ::fclose(f);
+
+        K.SetInt32(0);
+        GET("checksum", p->clientSock, K.bits64, 32, ntimeout);
+
+        if (!K.IsEqual(&checkSum)) {
+          ::printf("\nWarning, Kangaroo backup wrong checksum %s\n", fileName);
+        } else {
+          remove(fileName);
+          rename(fileNameTmp, fileName);
+        }
+      } break;
+
+      case SERVER_STATUS: {
+        state = GetServerStatus();
+        PUT("Status", p->clientSock, &state, sizeof(int32_t), ntimeout);
+      } break;
+      
+      case SERVER_GETPOOLSTATS: {
+        // Send pool statistics to the client
+        uint64_t totalDP = GetTotalDP();
+        PUT("TotalDP", p->clientSock, &totalDP, sizeof(uint64_t), ntimeout);
+        
+        std::string address(p->bitcoinAddress);
+        uint64_t clientDP = 0;
+        double percentage = 0.0;
+        
+        auto stats = GetClientStats();
+        auto it = stats.find(address);
+        if (it != stats.end()) {
+          clientDP = it->second.dpCount;
+          percentage = totalDP > 0 ? (double)clientDP / totalDP * 100.0 : 0.0;
+        }
+        
+        PUT("ClientDP", p->clientSock, &clientDP, sizeof(uint64_t), ntimeout);
+        PUT("Percentage", p->clientSock, &percentage, sizeof(double), ntimeout);
+      } break;
+      
+      case SERVER_SENDDP: {
+        DPHEADER head;
+        GET("DPHeader", p->clientSock, &head, sizeof(DPHEADER), ntimeout);
+        if (head.header != SERVER_HEADER) {
+          ::printf("\nUnexpected DP header from %s\n", p->clientInfo);
+          CLIENT_ABORT();
+        }
+
+        if (head.nbDP == 0) {
+          ::printf("\nUnexpected number of DP [%d] from %s\n", head.nbDP, p->clientInfo);
+          CLIENT_ABORT();
+        } else {
+          DP *dp = (DP *)malloc(sizeof(DP) * head.nbDP);
+          GETFREE("DP", p->clientSock, dp, sizeof(DP) * head.nbDP, ntimeout, dp);
+          state = GetServerStatus();
+          PUTFREE("Status", p->clientSock, &state, sizeof(int32_t), ntimeout, dp);
+          
+          if (nbRead != sizeof(DP) * head.nbDP) {
+            ::printf("\nUnexpected DP size from %s [nbDP=%d, Got %d, Expected %d]\n",
+                p->clientInfo, head.nbDP, nbRead, (int)(sizeof(DP) * head.nbDP));
+            free(dp);
+            CLIENT_ABORT();
+          } else {
+            // Enhanced security: validate each DP before counting
+            uint32_t validDPs = 0;
+            std::vector<DP> validatedDPs;
+            
+            for (uint32_t i = 0; i < head.nbDP; i++) {
+              // Check 1: Verify DP is valid (has the required number of leading zeros)
+              // The high bits of the x-coordinate should match our DP mask
+              if (!IsDP(dp[i].x.i64[3])) {
+                ::printf("Invalid DP from %s: DP #%d doesn't have required leading zeros\n", 
+                         p->clientInfo, i);
+                continue;
+              }
+              
+              // Check 2: Verify this DP hasn't been submitted before (by any client)
+              bool isDuplicate = false;
+              LOCK(ghMutex);
+              
+              // Check against our processed DPs
+              for (const auto& cache : recvDP) {
+                for (uint32_t j = 0; j < cache.nbDP; j++) {
+                  if (memcmp(&dp[i].x, &cache.dp[j].x, sizeof(int256_t)) == 0) {
+                    isDuplicate = true;
+                    break;
+                  }
+                }
+                if (isDuplicate) break;
+              }
+              UNLOCK(ghMutex);
+              
+              if (isDuplicate) {
+                ::printf("Duplicate DP from %s: DP #%d was already submitted\n", 
+                         p->clientInfo, i);
+                continue;
+              }
+              
+              // This DP passed all checks, it's valid
+              validDPs++;
+              validatedDPs.push_back(dp[i]);
+            }
+            
+            // If we found any valid DPs, update the client stats and add to processing
+            if (validDPs > 0) {
+              // Update client statistics with only the valid DP count
+              UpdateClientStats(p->bitcoinAddress, validDPs, p->clientInfo);
+              
+              // Create a new array with only valid DPs
+              DP *validDpArray = (DP *)malloc(sizeof(DP) * validDPs);
+              for (uint32_t i = 0; i < validDPs; i++) {
+                memcpy(&validDpArray[i], &validatedDPs[i], sizeof(DP));
+              }
+              
+              // Add the validated DPs to processing queue
+              LOCK(ghMutex);
+              DP_CACHE dc;
+              dc.nbDP = validDPs;
+              dc.dp = validDpArray;
+              recvDP.push_back(dc);
+              UNLOCK(ghMutex);
+              
+              ::printf("Received %d valid DPs from %s (client reported %d)\n", 
+                       validDPs, p->clientInfo, head.nbDP);
+            } else {
+              ::printf("No valid DPs from %s (client reported %d)\n", 
+                       p->clientInfo, head.nbDP);
+            }
+            
+            // Free the original DP array since we've created a new one with only valid DPs
+            free(dp);
+          }
+        }
+      } break;
+
+      default:
+        ::printf("\nUnexpected command [%d] from %s\n", cmdBuff, p->clientInfo);
+        CLIENT_ABORT();
+    }
+  }
+
+  close_socket(p->clientSock);
+  return true;
+}
 
 // Server request handler
 bool Kangaroo::HandleRequest(TH_PARAM *p) {
@@ -379,49 +820,38 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
       PUT("Status",p->clientSock,&state,sizeof(int32_t),ntimeout);
 
     } break;
-      case SERVER_SENDDP: {
-        DPHEADER head;
-        GET("DPHeader", p->clientSock, &head, sizeof(DPHEADER), ntimeout);
-        if (head.header != SERVER_HEADER) {
-            ::printf("\nUnexpected DP header from %s\n", p->clientInfo);
-            CLIENT_ABORT();
-        }
+    
+    case SERVER_SENDDP: {
+      DPHEADER head;
+      GET("DPHeader", p->clientSock, &head, sizeof(DPHEADER), ntimeout);
+      if (head.header != SERVER_HEADER) {
+          ::printf("\nUnexpected DP header from %s\n", p->clientInfo);
+          CLIENT_ABORT();
+      }
 
-        if (head.nbDP == 0) {
-            ::printf("\nUnexpected number of DP [%d] from %s\n", head.nbDP, p->clientInfo);
-            CLIENT_ABORT();
-        } else {
-            DP *dp = (DP *)malloc(sizeof(DP) * head.nbDP);
-            GETFREE("DP", p->clientSock, dp, sizeof(DP) * head.nbDP, ntimeout, dp);
-            state = GetServerStatus();
-            PUTFREE("Status", p->clientSock, &state, sizeof(int32_t), ntimeout, dp);
-            
-            if (nbRead != sizeof(DP) * head.nbDP) {
-                ::printf("\nUnexpected DP size from %s [nbDP=%d, Got %d, Expected %d]\n",
-                    p->clientInfo, head.nbDP, nbRead, (int)(sizeof(DP) * head.nbDP));
-                free(dp);
-                CLIENT_ABORT();
-            } else {
-                // Update the total DP count for the current IP
-                dpCounts[p->clientInfo] += head.nbDP;
-
-                // Log the total DP count to clients.txt on the same line
-                std::ofstream logFile("clients.txt", std::ios::out | std::ios::trunc);
-                if (logFile.is_open()) {
-                    logFile << "IP: " << p->clientInfo << ", Total DPs received: " << dpCounts[p->clientInfo];
-                    logFile.close();
-                } else {
-                    ::printf("\nUnable to open clients.txt for logging.\n");
-                }
-
-                LOCK(ghMutex);
-                DP_CACHE dc;
-                dc.nbDP = head.nbDP;
-                dc.dp = dp;
-                recvDP.push_back(dc);
-                UNLOCK(ghMutex);
-            }
-        }
+      if (head.nbDP == 0) {
+          ::printf("\nUnexpected number of DP [%d] from %s\n", head.nbDP, p->clientInfo);
+          CLIENT_ABORT();
+      } else {
+          DP *dp = (DP *)malloc(sizeof(DP) * head.nbDP);
+          GETFREE("DP", p->clientSock, dp, sizeof(DP) * head.nbDP, ntimeout, dp);
+          state = GetServerStatus();
+          PUTFREE("Status", p->clientSock, &state, sizeof(int32_t), ntimeout, dp);
+          
+          if (nbRead != sizeof(DP) * head.nbDP) {
+              ::printf("\nUnexpected DP size from %s [nbDP=%d, Got %d, Expected %d]\n",
+                  p->clientInfo, head.nbDP, nbRead, (int)(sizeof(DP) * head.nbDP));
+              free(dp);
+              CLIENT_ABORT();
+          } else {              
+              LOCK(ghMutex);
+              DP_CACHE dc;
+              dc.nbDP = head.nbDP;
+              dc.dp = dp;
+              recvDP.push_back(dc);
+              UNLOCK(ghMutex);
+          }
+      }
     } break;
 
     default:
@@ -433,7 +863,6 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
   close_socket(p->clientSock);
   return true;
 }
-
 
 void *_acceptThread(void *lpParam) {
   TH_PARAM *p = (TH_PARAM *)lpParam;
@@ -447,10 +876,60 @@ void *_acceptThread(void *lpParam) {
   return 0;
 }
 
+void *_acceptPoolThread(void *lpParam) {
+  TH_PARAM *p = (TH_PARAM *)lpParam;
+  p->obj->AddConnectedClient();
+  p->obj->HandlePoolRequest(p);
+  p->obj->RemoveConnectedClient();
+  p->obj->RemoveConnectedKangaroo(p->nbKangaroo);
+  p->isRunning = false;
+  free(p->clientInfo);
+  if (p->bitcoinAddress) {
+    free(p->bitcoinAddress);
+  }
+  free(p);
+  return 0;
+}
+
 void *_processServer(void *lpParam) {
   Kangaroo *obj = (Kangaroo *)lpParam;
   obj->ProcessServer();
   return 0;
+}
+
+void *_processPoolServer(void *lpParam) {
+  TH_PARAM *p = (TH_PARAM *)lpParam;
+  p->obj->ProcessPoolServer();
+  return 0;
+}
+
+// Process function for pool server
+void Kangaroo::ProcessPoolServer() {
+  ProcessServer(); // Use the same processing logic as regular server
+}
+
+// Pool server connections acceptor
+void Kangaroo::AcceptPoolConnections(SOCKET server_soc) {
+  SOCKET clientSock;
+  ::printf("Kangaroo pool server is ready and listening to TCP port %d ...\n",port);
+  
+  while(true) {
+    struct sockaddr_in client_add;
+    socklen_t len = sizeof(sockaddr_in);
+    if((clientSock = accept(server_soc,(struct sockaddr*)&client_add,&len)) < 0) {
+      ::printf("Error: Invalid Socket returned by accept(): %s\n",GetNetworkError().c_str());
+    } else {
+      TH_PARAM *p = (TH_PARAM *)malloc(sizeof(TH_PARAM));
+      ::memset(p,0,sizeof(TH_PARAM));
+      char info[256];
+      ::sprintf(info,"%s:%d",inet_ntoa(client_add.sin_addr),ntohs(client_add.sin_port));
+      p->clientInfo = ::strdup(info);
+      p->obj = this;
+      p->isRunning = true;
+      p->clientSock = clientSock;
+      LaunchThread(_acceptPoolThread,p);
+    }
+  }
 }
 
 // Main server loop
@@ -475,6 +954,91 @@ void Kangaroo::AcceptConnections(SOCKET server_soc) {
       LaunchThread(_acceptThread,p);
     }
   }
+}
+
+// Run pool server
+void Kangaroo::RunPoolServer() {
+  
+  if(signal(SIGINT,sig_handler) == SIG_ERR)
+    ::printf("\nWarning:can't install singal handler\n");
+
+  // Set starting parameters
+  InitRange();
+  InitSearchKey();
+
+  ComputeExpected((double)initDPSize,&expectedNbOp,&expectedMem);
+  ::printf("Expected operations: 2^%.2f\n",log2(expectedNbOp));
+  ::printf("Expected RAM usage: %.1fMB\n",expectedMem);
+
+  if(initDPSize<0) {
+    ::printf("Error: Pool server must be launched with a specified number of distinguished bits (-d)\n");
+    exit(-1);
+  }
+  SetDP(initDPSize);
+
+  // Initialize pool stats tracking
+  pthread_mutex_init(&poolStatsMutex,NULL);
+  totalPoolDP = 0;
+  clientStats.clear();
+  
+  // Create the server socket
+  struct sockaddr_in soc_addr;
+  int serverSockOpt = 1;
+  struct protoent *p;
+  
+  #ifdef WIN64
+    WSADATA WSAData;
+    if(WSAStartup(MAKEWORD(2,2),&WSAData)!=0) {
+      printf("Error: Cannot start Windows socket\n");
+      exit(-1);
+    }
+  #endif
+
+  // Create socket
+  if((serverSock = socket(AF_INET,SOCK_STREAM,0)) < 0) {
+    ::printf("Error: Unable to create socket: %s\n",GetNetworkError().c_str());
+    exit(-1);
+  }
+
+  if(setsockopt(serverSock,SOL_SOCKET,SO_REUSEADDR,(char *)&serverSockOpt,sizeof(serverSockOpt)) < 0) {
+    ::printf("Error: setsockopt(SO_REUSEADDR): %s\n",GetNetworkError().c_str());
+    close_socket(serverSock);
+    exit(-1);
+  }
+
+  // Reuse address
+  memset(&soc_addr,0,sizeof(soc_addr));
+  soc_addr.sin_family = AF_INET;
+  soc_addr.sin_addr.s_addr = INADDR_ANY;
+  soc_addr.sin_port = htons(port);
+
+  // Bind
+  if(bind(serverSock,(struct sockaddr*)&soc_addr,sizeof(soc_addr))) {
+    ::printf("Error: Unable to bind: %s\n",GetNetworkError().c_str());
+    close_socket(serverSock);
+    exit(-1);
+  }
+
+  // Listen
+  if(listen(serverSock,5)) {
+    ::printf("Error: Unable to listen: %s\n",GetNetworkError().c_str());
+    close_socket(serverSock);
+    exit(-1);
+  }
+
+  // Thread managment
+  pthread_t processThread;
+
+  // Process thread (DP processing)
+  TH_PARAM *threadParam = (TH_PARAM *)malloc(sizeof(TH_PARAM));
+  memset(threadParam, 0, sizeof(TH_PARAM));
+  threadParam->obj = this;
+  threadParam->isRunning = true;
+  LaunchThread(_processPoolServer, threadParam);
+
+  // Accept connections
+  AcceptPoolConnections(serverSock);
+
 }
 
 // Starts the server
@@ -954,6 +1518,30 @@ bool Kangaroo::GetConfigFromServer() {
   rangeStart.SetInt32(0);
   rangeEnd.SetInt32(0);
   initDPSize = -1;
+
+  // If in pool mode, send the Bitcoin address first
+  if (poolMode) {
+    // Get the Bitcoin address from command line arguments
+    if (bitcoinAddress.empty()) {
+      ::printf("Error: Bitcoin address required for pool mode\n");
+      close_socket(serverConn);
+      isConnected = false;
+      return false;
+    }
+    
+    if (!IsValidBitcoinAddress(bitcoinAddress)) {
+      ::printf("Error: Invalid Bitcoin address format: %s\n", bitcoinAddress.c_str());
+      close_socket(serverConn);
+      isConnected = false;
+      return false;
+    }
+    
+    uint32_t addrLength = bitcoinAddress.length();
+    PUT("AddressLength", serverConn, &addrLength, sizeof(uint32_t), ntimeout);
+    PUT("BitcoinAddress", serverConn, bitcoinAddress.c_str(), addrLength, ntimeout);
+    
+    ::printf("Connected to pool server with Bitcoin address: %s\n", bitcoinAddress.c_str());
+  }
 
   char cmd = SERVER_GETCONFIG;
   PUT("CMD",serverConn,&cmd,1,ntimeout);

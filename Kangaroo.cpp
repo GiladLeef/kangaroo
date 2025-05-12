@@ -15,7 +15,7 @@ using namespace std;
 #define safe_delete_array(x) if(x) {delete[] x;x=NULL;}
 
 Kangaroo::Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,string &workFile,string &iWorkFile,uint32_t savePeriod,bool saveKangaroo,bool saveKangarooByServer,
-                   double maxStep,int wtimeout,int port,int ntimeout,string serverIp,string outputFile,bool splitWorkfile) {
+                   double maxStep,int wtimeout,int port,int ntimeout,string serverIp,string outputFile,bool splitWorkfile,bool poolMode) {
 
   this->secp = secp;
   this->initDPSize = initDPSize;
@@ -45,11 +45,14 @@ Kangaroo::Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,string &workFi
   this->keyIdx = 0;
   this->splitWorkfile = splitWorkfile;
   this->pid = Timer::getPID();
+  this->poolMode = poolMode;
+  this->totalPoolDP = 0;
 
   CPU_GRP_SIZE = 1024;
 
   pthread_mutex_init(&ghMutex, NULL);
   pthread_mutex_init(&saveMutex, NULL);
+  pthread_mutex_init(&poolStatsMutex, NULL);
   signal(SIGFPE, SIG_IGN);
 
 }
