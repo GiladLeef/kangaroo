@@ -572,8 +572,6 @@ bool Kangaroo::HandlePoolRequest(TH_PARAM *p) {
               recvDP.push_back(dc);
               UNLOCK(ghMutex);
               
-              ::printf("Received %d valid DPs from %s (client reported %d)\n", 
-                       validDPs, p->clientInfo, head.nbDP);
             } else {
               ::printf("No valid DPs from %s (client reported %d)\n", 
                        p->clientInfo, head.nbDP);
