@@ -10,7 +10,6 @@
 #include <unordered_map>
 #include <regex>
 #include <chrono>
-#include <unordered_set>
 
 using namespace std;
 
@@ -219,6 +218,8 @@ bool Kangaroo::SavePoolStats() {
   
   statsFile << "{\n";
   statsFile << "  \"totalDP\": " << totalPoolDP << ",\n";
+  // Add expected DPs based on our calculated operations
+  statsFile << "  \"expectedDP\": " << (uint64_t)expectedNbOp << ",\n";
   statsFile << "  \"clients\": [\n";
   
   bool first = true;
@@ -539,7 +540,7 @@ bool Kangaroo::HandlePoolRequest(TH_PARAM *p) {
             std::vector<DP> validatedDPs;
             
             for (uint32_t i = 0; i < head.nbDP; i++) {
-              // Check 1: Verify DP is valid (has the required number of leading zeros)
+              // Check: Verify DP is valid (has the required number of leading zeros)
               // The high bits of the x-coordinate should match our DP mask
               if (!IsDP(dp[i].x.i64[3])) {
                 ::printf("Invalid DP from %s: DP #%d doesn't have required leading zeros\n", 
@@ -547,29 +548,7 @@ bool Kangaroo::HandlePoolRequest(TH_PARAM *p) {
                 continue;
               }
               
-              // Check 2: Verify this DP hasn't been submitted before (by any client)
-              bool isDuplicate = false;
-              LOCK(ghMutex);
-              
-              // Create a hash string from the DP's x coordinate
-              char hashStr[65];
-              sprintf(hashStr, "%016lx%016lx%016lx%016lx", 
-                      dp[i].x.i64[3], dp[i].x.i64[2], dp[i].x.i64[1], dp[i].x.i64[0]);
-              std::string dpHash(hashStr);
-              
-              // Fast O(1) lookup in hash set
-              if (processedDPHashes.find(dpHash) != processedDPHashes.end()) {
-                isDuplicate = true;
-              }
-              UNLOCK(ghMutex);
-              
-              if (isDuplicate) {
-                ::printf("Duplicate DP from %s: DP #%d was already submitted\n", 
-                         p->clientInfo, i);
-                continue;
-              }
-              
-              // This DP passed all checks, it's valid
+              // This DP passed the check, it's valid
               validDPs++;
               validatedDPs.push_back(dp[i]);
             }
@@ -591,15 +570,6 @@ bool Kangaroo::HandlePoolRequest(TH_PARAM *p) {
               dc.nbDP = validDPs;
               dc.dp = validDpArray;
               recvDP.push_back(dc);
-              
-              // Add hashes of all validated DPs to our set for future duplicate checking
-              for (uint32_t i = 0; i < validDPs; i++) {
-                char hashStr[65];
-                sprintf(hashStr, "%016lx%016lx%016lx%016lx", 
-                        validDpArray[i].x.i64[3], validDpArray[i].x.i64[2], 
-                        validDpArray[i].x.i64[1], validDpArray[i].x.i64[0]);
-                processedDPHashes.insert(std::string(hashStr));
-              }
               UNLOCK(ghMutex);
               
               ::printf("Received %d valid DPs from %s (client reported %d)\n", 
@@ -853,7 +823,7 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
                   p->clientInfo, head.nbDP, nbRead, (int)(sizeof(DP) * head.nbDP));
               free(dp);
               CLIENT_ABORT();
-          } else {              
+          } else {
               LOCK(ghMutex);
               DP_CACHE dc;
               dc.nbDP = head.nbDP;
@@ -990,7 +960,6 @@ void Kangaroo::RunPoolServer() {
   pthread_mutex_init(&poolStatsMutex,NULL);
   totalPoolDP = 0;
   clientStats.clear();
-  processedDPHashes.clear();
   
   // Create the server socket
   struct sockaddr_in soc_addr;

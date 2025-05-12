@@ -280,7 +280,6 @@ private:
   // Pool mode stuff
   bool poolMode;
   std::unordered_map<std::string, CLIENT_STATS> clientStats;
-  std::unordered_set<std::string> processedDPHashes; 
   uint64_t totalPoolDP;
 };
 

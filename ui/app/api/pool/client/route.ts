@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
           address,
           dpCount: 0,
           percentage: 0,
-          totalDP: data.totalDP 
+          totalDP: data.totalDP,
+          expectedDP: data.expectedDP
         }, 
         { status: 200 }
       );
@@ -53,7 +54,8 @@ export async function GET(request: NextRequest) {
       percentage: client.percentage,
       lastSeen: client.lastSeen,
       clientInfo: client.clientInfo,
-      totalDP: data.totalDP
+      totalDP: data.totalDP,
+      expectedDP: data.expectedDP
     }, { status: 200 });
   } catch (error) {
     console.error('Error reading pool stats:', error);

@@ -11,6 +11,7 @@ type ClientStats = {
   lastSeen?: string;
   clientInfo?: string;
   totalDP: number;
+  expectedDP: number;
 };
 
 export default function ClientStatsPage() {
@@ -151,7 +152,7 @@ export default function ClientStatsPage() {
             </div>
             
             <div className="mt-8 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-medium mb-3">Progress Visualization</h3>
+              <h3 className="text-lg font-medium mb-3">Your Progress Contribution</h3>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
                 <div 
                   className="bg-blue-500 h-4 rounded-full"
@@ -160,6 +161,25 @@ export default function ClientStatsPage() {
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                 Your contribution relative to the entire pool
+              </p>
+            </div>
+            
+            <div className="mt-8 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-medium mb-3">Overall Pool Progress</h3>
+              <div className="mb-2 flex justify-between">
+                <span>{stats.totalDP.toLocaleString()} / {stats.expectedDP.toLocaleString()} DPs</span>
+                <span>{stats.expectedDP > 0 ? Math.min(100, Math.floor((stats.totalDP / stats.expectedDP) * 100)) : 0}%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
+                <div 
+                  className="bg-blue-500 h-4 rounded-full transition-all duration-300"
+                  style={{ 
+                    width: `${stats.expectedDP > 0 ? Math.min(100, (stats.totalDP / stats.expectedDP) * 100) : 0}%` 
+                  }}
+                ></div>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                Estimated progress toward solving the current ECDLP challenge
               </p>
             </div>
             

@@ -13,6 +13,7 @@ type ClientStats = {
 
 type PoolStats = {
   totalDP: number;
+  expectedDP: number;
   clients: ClientStats[];
 };
 
@@ -110,6 +111,25 @@ export default function PoolPage() {
               Refresh Now
             </button>
           </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4">Overall Progress</h2>
+          <div className="mb-2 flex justify-between">
+            <span>{stats?.totalDP.toLocaleString()} / {stats?.expectedDP.toLocaleString()} Distinguished Points</span>
+            <span>{stats && stats.expectedDP > 0 ? Math.min(100, Math.floor((stats.totalDP / stats.expectedDP) * 100)) : 0}%</span>
+          </div>
+          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-6">
+            <div 
+              className="bg-blue-500 h-6 rounded-full transition-all duration-300"
+              style={{ 
+                width: `${stats && stats.expectedDP > 0 ? Math.min(100, (stats.totalDP / stats.expectedDP) * 100) : 0}%` 
+              }}
+            ></div>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            Estimated progress toward solving the current ECDLP challenge
+          </p>
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
