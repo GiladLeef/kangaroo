@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <regex>
 #include <chrono>
+#include <unordered_set>
 
 using namespace std;
 
@@ -550,15 +551,15 @@ bool Kangaroo::HandlePoolRequest(TH_PARAM *p) {
               bool isDuplicate = false;
               LOCK(ghMutex);
               
-              // Check against our processed DPs
-              for (const auto& cache : recvDP) {
-                for (uint32_t j = 0; j < cache.nbDP; j++) {
-                  if (memcmp(&dp[i].x, &cache.dp[j].x, sizeof(int256_t)) == 0) {
-                    isDuplicate = true;
-                    break;
-                  }
-                }
-                if (isDuplicate) break;
+              // Create a hash string from the DP's x coordinate
+              char hashStr[65];
+              sprintf(hashStr, "%016lx%016lx%016lx%016lx", 
+                      dp[i].x.i64[3], dp[i].x.i64[2], dp[i].x.i64[1], dp[i].x.i64[0]);
+              std::string dpHash(hashStr);
+              
+              // Fast O(1) lookup in hash set
+              if (processedDPHashes.find(dpHash) != processedDPHashes.end()) {
+                isDuplicate = true;
               }
               UNLOCK(ghMutex);
               
@@ -590,6 +591,15 @@ bool Kangaroo::HandlePoolRequest(TH_PARAM *p) {
               dc.nbDP = validDPs;
               dc.dp = validDpArray;
               recvDP.push_back(dc);
+              
+              // Add hashes of all validated DPs to our set for future duplicate checking
+              for (uint32_t i = 0; i < validDPs; i++) {
+                char hashStr[65];
+                sprintf(hashStr, "%016lx%016lx%016lx%016lx", 
+                        validDpArray[i].x.i64[3], validDpArray[i].x.i64[2], 
+                        validDpArray[i].x.i64[1], validDpArray[i].x.i64[0]);
+                processedDPHashes.insert(std::string(hashStr));
+              }
               UNLOCK(ghMutex);
               
               ::printf("Received %d valid DPs from %s (client reported %d)\n", 
@@ -980,6 +990,7 @@ void Kangaroo::RunPoolServer() {
   pthread_mutex_init(&poolStatsMutex,NULL);
   totalPoolDP = 0;
   clientStats.clear();
+  processedDPHashes.clear();
   
   // Create the server socket
   struct sockaddr_in soc_addr;

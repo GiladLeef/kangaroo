@@ -8,6 +8,7 @@
 #include "Constants.h"
 #include "GPU/GPUEngine.h"
 #include <unordered_map>
+#include <unordered_set>
 
 typedef int SOCKET;
 #include <sys/socket.h>
@@ -279,6 +280,7 @@ private:
   // Pool mode stuff
   bool poolMode;
   std::unordered_map<std::string, CLIENT_STATS> clientStats;
+  std::unordered_set<std::string> processedDPHashes; 
   uint64_t totalPoolDP;
 };
 
