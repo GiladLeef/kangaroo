@@ -36,8 +36,8 @@ endif
 
 CXX        = g++
 CUDA       = /usr/local/cuda
-CXXCUDA    = /usr/bin/g++
-NVCC       = $(CUDA)/bin/nvcc
+CXXCUDA    = g++
+NVCC       = nvcc
 CXXFLAGS   =  -m64 -march=native -mtune=native -msse4.2 -mavx2 -ffast-math -funroll-loops -fomit-frame-pointer -flto -Wno-write-strings -Wno-unused-result -O3 -I.
 ifdef gpu
 
