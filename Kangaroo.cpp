@@ -289,7 +289,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     IntGroup grp(CPU_GRP_SIZE);
     Int dx[CPU_GRP_SIZE];
     Int dy, rx, ry, _s, _p;
-    Int altRx, altRy;
     uint64_t jmps[CPU_GRP_SIZE];
     Int *p1xs[CPU_GRP_SIZE];
     Int *p1ys[CPU_GRP_SIZE];
@@ -297,11 +296,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
     Int *p2ys[CPU_GRP_SIZE];
     Int *distances[CPU_GRP_SIZE];
     bool isDPs[CPU_GRP_SIZE];
-    bool altIsDPs[CPU_GRP_SIZE];
-    
-    Int backPx[CPU_GRP_SIZE];
-    Int backPy[CPU_GRP_SIZE];
-    Int backDist[CPU_GRP_SIZE];
 
     // Create Kangaroos if not already loaded
     if (ph->px == nullptr) {
@@ -332,7 +326,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
         grp.Set(dx);
         grp.ModInv();
 
-        // Second pass - calculate both forward and backward points
+        // Second pass - calculate forward points
         for (int g = 0; g < CPU_GRP_SIZE; g++) {
             dy.ModSub(p2ys[g], p1ys[g]);
             _s.ModMulK1(&dy, &dx[g]);
@@ -345,23 +339,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             ry.ModSub(p2xs[g], &rx);
             ry.ModMulK1(&_s);
             ry.ModSub(p2ys[g]);
-
-            // Backward jump point calculation (cheap second-point trick)
-            // Derive alternate X coordinate cheaply: altRx = -rx
-            altRx.Set(&rx);
-            altRx.ModNeg();
-            
-            altRy.ModSub(p2xs[g], &altRx);
-            altRy.ModMulK1(&_s);
-            altRy.ModSub(p2ys[g]);
-            altRy.ModNeg();
-            
-            // Store backward point data for batch processing later
-            backPx[g].Set(&altRx);
-            backPy[g].Set(&altRy);
-            backDist[g].Set(&ph->distance[g]);
-            backDist[g].ModSubK1order(distances[g]);
-            altIsDPs[g] = IsDP(backPx[g].bits64[3]);
             
             // Update forward point
             ph->px[g].Set(&rx);
@@ -383,15 +360,6 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
                     it.kIdx = g;
                     dps.push_back(it);
                 }
-                
-                // Process backward points
-                if (altIsDPs[g]) {
-                    ITEM it;
-                    it.x.Set(&backPx[g]);
-                    it.d.Set(&backDist[g]);
-                    it.kIdx = g;
-                    dps.push_back(it);
-                }
             }
             
             // Send data to server when appropriate
@@ -404,7 +372,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
                 dps.clear();
             }
             
-            counters[thId] += CPU_GRP_SIZE * 2; // Count both forward and backward
+            counters[thId] += CPU_GRP_SIZE;
         } else {
             // -----------------------------------------------------------------
             //  Optimisation: lock the global hash table ONLY when we actually
@@ -415,12 +383,12 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
 
             bool haveDP = false;
             for (int g = 0; g < CPU_GRP_SIZE && !haveDP; ++g)
-                haveDP = isDPs[g] | altIsDPs[g];
+                haveDP = isDPs[g];
 
             if (haveDP) {
                 LOCK(ghMutex);
 
-                // Process both forward and backward points
+                // Process forward points
                 for (int g = 0; g < CPU_GRP_SIZE && !endOfSearch; g++) {
                     // Forward
                     if (isDPs[g]) {
@@ -430,20 +398,13 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
                             collisionInSameHerd++;
                         }
                     }
-
-                    // Backward (cheap second point)
-                    if (altIsDPs[g]) {
-                        if (!AddToTable(&backPx[g], &backDist[g], g % 2)) {
-                            collisionInSameHerd++;
-                        }
-                    }
-                    counters[thId] += 2;
+                    counters[thId] += 1;
                 }
 
                 UNLOCK(ghMutex);
             } else {
                 // No DP in this batch → just count the iterations.
-                counters[thId] += CPU_GRP_SIZE * 2;
+                counters[thId] += CPU_GRP_SIZE;
             }
         }
 
@@ -530,7 +491,7 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
   while(!endOfSearch) {
 
     gpu->Launch(gpuFound);
-    counters[thId] += ph->nbKangaroo * NB_RUN * 2;  // Double count for second-point trick
+    counters[thId] += ph->nbKangaroo * NB_RUN;
 
     if( clientMode ) {
 
