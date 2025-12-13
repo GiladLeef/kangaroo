@@ -12,8 +12,6 @@
 
 Int _ONE((uint64_t)1);
 
-
-
 Int::Int() {
 }
 
