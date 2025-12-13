@@ -193,6 +193,7 @@ private:
   bool GetKangaroosFromServer(std::string& fileName,std::vector<int256_t>& kangs);
 
   pthread_mutex_t  ghMutex;
+  pthread_mutex_t  rngMutex;
   pthread_mutex_t  saveMutex;
   pthread_mutex_t  poolStatsMutex;
   THREAD_HANDLE LaunchThread(void *(*func) (void *), TH_PARAM *p);

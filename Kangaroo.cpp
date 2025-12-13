@@ -51,6 +51,7 @@ Kangaroo::Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,string &workFi
   CPU_GRP_SIZE = 1024;
 
   pthread_mutex_init(&ghMutex, NULL);
+  pthread_mutex_init(&rngMutex, NULL);
   pthread_mutex_init(&saveMutex, NULL);
   pthread_mutex_init(&poolStatsMutex, NULL);
   signal(SIGFPE, SIG_IGN);
@@ -365,9 +366,7 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
             // Send data to server when appropriate
             double now = Timer::getTick();
             if (now - lastSent > SEND_PERIOD && !dps.empty()) {
-                LOCK(ghMutex);
                 SendToServer(dps, ph->threadId, 0xFFFF);
-                UNLOCK(ghMutex);
                 lastSent = now;
                 dps.clear();
             }
@@ -498,9 +497,7 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
 
       double now = Timer::getTick();
       if(now - lastSent > SEND_PERIOD) {
-        LOCK(ghMutex);
         SendToServer(dps,ph->threadId,ph->gpuId);
-        UNLOCK(ghMutex);
         lastSent = now;
       }
 
@@ -575,7 +572,7 @@ void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstTyp
     Z.Clear();
     int offset = firstType % 2;
     
-    if (lock) LOCK(ghMutex);
+    LOCK(rngMutex);
 
     const bool isTame = (offset % 2 == TAME);
     for (int j = 0; j < nbKangaroo; j++) {
@@ -590,7 +587,7 @@ void Kangaroo::CreateHerd(int nbKangaroo, Int *px, Int *py, Int *d, int firstTyp
         pk[j] = d[j];
     }
 
-    if (lock) UNLOCK(ghMutex);
+    UNLOCK(rngMutex);
     
     S = secp->ComputePublicKeys(pk);
 

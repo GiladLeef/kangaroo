@@ -98,7 +98,6 @@ string Kangaroo::GetTimeStr(double dTime) {
 
 // Wait for end of server and dispay stats
 void Kangaroo::ProcessServer() {
-    pthread_mutex_init(&ghMutex, NULL);
     setvbuf(stdout, NULL, _IONBF, 0);
 
     double t0 = Timer::getTick();

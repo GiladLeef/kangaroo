@@ -15,6 +15,12 @@ using namespace std;
 
 static SOCKET serverSock = 0;
 
+struct MutexLock {
+    pthread_mutex_t *m;
+    MutexLock(pthread_mutex_t *mutex) : m(mutex) { pthread_mutex_lock(m); }
+    ~MutexLock() { pthread_mutex_unlock(m); }
+};
+
 // Common part
 #define MAX_CLIENT 256
 #define WAIT_FOR_READ  1
@@ -1352,6 +1358,7 @@ bool Kangaroo::GetKangaroosFromServer(std::string& fileName,std::vector<int256_t
 
 // Send Kangaroo to Server
 bool Kangaroo::SendKangaroosToServer(std::string& fileName,std::vector<int256_t>& kangs) {
+  MutexLock l(&ghMutex);
   int nbWrite;
   uint32_t fileNameSize = (uint32_t)fileName.length();
   uint64_t nbKangaroo = kangs.size();
@@ -1426,7 +1433,10 @@ bool Kangaroo::SendToServer(std::vector<ITEM> &dps,uint32_t threadId,uint32_t gp
   if(dps.size()==0)
     return false;
 
-  WaitForServer();
+  {
+    MutexLock l(&ghMutex);
+    WaitForServer();
+  }
   
   if(!endOfSearch) {
     int32_t status;
@@ -1456,10 +1466,13 @@ bool Kangaroo::SendToServer(std::vector<ITEM> &dps,uint32_t threadId,uint32_t gp
     head.processId = pid;
     head.threadId = threadId;
 
-    PUTFREE("CMD",serverConn,&cmd,1,ntimeout,dp);
-    PUTFREE("DPHeader",serverConn,&head,sizeof(DPHEADER),ntimeout,dp);
-    PUTFREE("DP",serverConn,dp,sizeof(DP)*nbDP,ntimeout,dp);
-    GETFREE("Status",serverConn,&status,sizeof(uint32_t),ntimeout,dp)
+    {
+      MutexLock l(&ghMutex);
+      PUTFREE("CMD",serverConn,&cmd,1,ntimeout,dp);
+      PUTFREE("DPHeader",serverConn,&head,sizeof(DPHEADER),ntimeout,dp);
+      PUTFREE("DP",serverConn,dp,sizeof(DP)*nbDP,ntimeout,dp);
+      GETFREE("Status",serverConn,&status,sizeof(uint32_t),ntimeout,dp)
+    }
     dps.clear();
     free(dp);
   }
