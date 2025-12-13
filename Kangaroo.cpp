@@ -386,22 +386,20 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
                 haveDP = isDPs[g];
 
             if (haveDP) {
-                LOCK(ghMutex);
-
                 // Process forward points
                 for (int g = 0; g < CPU_GRP_SIZE && !endOfSearch; g++) {
                     // Forward
                     if (isDPs[g]) {
+                        LOCK(ghMutex);
                         if (!AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
                             // Collision inside the same herd – reset tame/wild
                             CreateHerd(1, &ph->px[g], &ph->py[g], &ph->distance[g], g % 2, false);
                             collisionInSameHerd++;
                         }
+                        UNLOCK(ghMutex);
                     }
                     counters[thId] += 1;
                 }
-
-                UNLOCK(ghMutex);
             } else {
                 // No DP in this batch → just count the iterations.
                 counters[thId] += CPU_GRP_SIZE;
@@ -508,9 +506,10 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
 
     } else {
       if(gpuFound.size() > 0) {
-        LOCK(ghMutex);
         
         for(int g = 0; !endOfSearch && g < gpuFound.size(); g++) {
+          
+          LOCK(ghMutex);
           uint32_t kType = (uint32_t)(gpuFound[g].kIdx % 2);
           if(!AddToTable(&gpuFound[g].x,&gpuFound[g].d,kType)) {
             // Collision inside the same herd
@@ -522,8 +521,9 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
             gpu->SetKangaroo(gpuFound[g].kIdx,&px,&py,&d);
             collisionInSameHerd++;
           }
+          UNLOCK(ghMutex);
+
         }
-        UNLOCK(ghMutex);
       }
     }
     // Save request
