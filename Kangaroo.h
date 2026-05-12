@@ -51,7 +51,6 @@ typedef struct {
   
   SOCKET clientSock;
   char  *clientInfo;
-  char  *bitcoinAddress; // Pool mode: client's Bitcoin address
 
   uint32_t hStart;
   uint32_t hStop;
@@ -59,14 +58,6 @@ typedef struct {
   char *part2Name;
 
 } TH_PARAM;
-
-// Client stats for pool mode
-typedef struct {
-  std::string address;
-  uint64_t dpCount;
-  uint64_t lastSeen;
-  std::string clientInfo;
-} CLIENT_STATS;
 
 // DP transfered over the network
 typedef struct {
@@ -106,10 +97,9 @@ class Kangaroo {
 public:
 
 Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,std::string &workFile,std::string &iWorkFile,uint32_t savePeriod,bool saveKangaroo,bool saveKangarooByServer,
-                   double maxStep,int wtimeout,int port,int ntimeout,std::string serverIp,std::string outputFile,bool splitWorkfile,bool poolMode=false);
+                   double maxStep,int wtimeout,int port,int ntimeout,std::string serverIp,std::string outputFile,bool splitWorkfile);
   void Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize);
   void RunServer();
-  void RunPoolServer();
   bool ParseConfigFile(std::string &fileName);
   bool LoadWork(std::string &fileName);
   void Check();
@@ -127,20 +117,14 @@ Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,std::string &workFile,st
   void SolveKeyCPU(TH_PARAM *p);
   void SolveKeyGPU(TH_PARAM *p);
   bool HandleRequest(TH_PARAM *p);
-  bool HandlePoolRequest(TH_PARAM *p);
   bool MergePartition(TH_PARAM* p);
   bool CheckPartition(TH_PARAM* p);
   bool CheckWorkFile(TH_PARAM* p);
   void ProcessServer();
-  void ProcessPoolServer();
 
   void AddConnectedClient();
   void RemoveConnectedClient();
   void RemoveConnectedKangaroo(uint64_t nb);
-  void UpdateClientStats(const std::string& address, uint32_t dpCount, const std::string& clientInfo);
-  std::unordered_map<std::string, CLIENT_STATS> GetClientStats();
-  uint64_t GetTotalDP();
-  void SetBitcoinAddress(const std::string& address) { bitcoinAddress = address; }
 
 private:
 
@@ -158,7 +142,6 @@ private:
   void InitSearchKey();
   std::string GetTimeStr(double s);
   bool Output(Int* pk,char sInfo,int sType);
-  bool IsValidBitcoinAddress(const std::string& address);
 
   // Backup stuff
   void SaveWork(std::string fileName,FILE *f,int type,uint64_t totalCount,double totalTime);
@@ -176,12 +159,9 @@ private:
   static std::string GetPartName(std::string& partName,int i,bool tmpPart);
   static FILE* OpenPart(std::string& partName,char* mode,int i,bool tmpPart=false);
   uint32_t CheckHash(uint32_t h,uint32_t nbItem,HashTable* hT,FILE* f);
-  bool SavePoolStats();
-
 
   // Network stuff
   void AcceptConnections(SOCKET server_soc);
-  void AcceptPoolConnections(SOCKET server_soc);
   int WaitFor(SOCKET sock,int timeout,int mode);
   int Write(SOCKET sock,char *buf,int bufsize,int timeout);
   int Read(SOCKET sock,char *buf,int bufsize,int timeout);
@@ -195,7 +175,6 @@ private:
   pthread_mutex_t  ghMutex;
   pthread_mutex_t  rngMutex;
   pthread_mutex_t  saveMutex;
-  pthread_mutex_t  poolStatsMutex;
   THREAD_HANDLE LaunchThread(void *(*func) (void *), TH_PARAM *p);
 
   void JoinThreads(THREAD_HANDLE *handles, int nbThread);
@@ -276,12 +255,6 @@ private:
   std::string serverStatus;
   int connectedClient;
   uint32_t pid;
-  std::string bitcoinAddress;
-  
-  // Pool mode stuff
-  bool poolMode;
-  std::unordered_map<std::string, CLIENT_STATS> clientStats;
-  uint64_t totalPoolDP;
 };
 
 #endif // KANGAROOH

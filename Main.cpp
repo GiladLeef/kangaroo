@@ -40,8 +40,6 @@ void printUsage() {
          << " -sp port: Server port, default is 17403\n"
          << " -nt timeout: Network timeout in milliseconds (default is 3000ms)\n"
          << " -o fileName: Output result to fileName\n"
-         << " -p: Start in pool mode (server)\n"
-         << " -a address: Bitcoin address (P2PK) for pool mode client, required when connecting to a pool\n"
          << " inFile: Input configuration file\n";
     exit(0);
 }
@@ -95,9 +93,8 @@ int main(int argc, char* argv[]) {
     vector<int> gpuId = {0};
     vector<int> gridSize;
     string workFile, iWorkFile, checkWorkFile, merge1, merge2, mergeDest, mergeDir, infoFile, outputFile;
-    bool gpuEnable = false, saveKangaroo = false, saveKangarooByServer = false, splitWorkFile = false, serverMode = false, checkFlag = false, poolMode = false;
+    bool gpuEnable = false, saveKangaroo = false, saveKangarooByServer = false, splitWorkFile = false, serverMode = false, checkFlag = false;
     string serverIP;
-    string bitcoinAddress;
     double maxStep = 0.0;
     int dp = -1, wtimeout = DEFAULT_TIMEOUT, ntimeout = DEFAULT_TIMEOUT, port = DEFAULT_PORT;
     string configFile;
@@ -152,14 +149,6 @@ int main(int argc, char* argv[]) {
             outputFile = argv[++a];
         } else if (arg == "-s") {
             serverMode = true;
-        } else if (arg == "-p") {
-            poolMode = true;
-        } else if (arg == "-a") {
-            if (a + 1 >= argc) {
-                cerr << "-a missing argument" << endl;
-                exit(0);
-            }
-            bitcoinAddress = argv[++a];
         } else if (arg == "-c") {
             if (a + 1 >= argc) {
                 cerr << "-c missing argument" << endl;
@@ -191,24 +180,13 @@ int main(int argc, char* argv[]) {
         exit(-1);
     }
 
-    // Check if address is provided for pool client mode
-    if (!serverIP.empty() && poolMode && bitcoinAddress.empty()) {
-        cerr << "Error: Bitcoin address (-a) is required when connecting to a pool server" << endl;
-        exit(-1);
-    }
-
     unique_ptr<Kangaroo> v = make_unique<Kangaroo>(
-        secp.get(), dp, gpuEnable, workFile, iWorkFile, savePeriod, saveKangaroo, saveKangarooByServer, 
-        maxStep, wtimeout, port, ntimeout, serverIP, outputFile, splitWorkFile, poolMode
+        secp.get(), dp, gpuEnable, workFile, iWorkFile, savePeriod, saveKangaroo, saveKangarooByServer,
+        maxStep, wtimeout, port, ntimeout, serverIP, outputFile, splitWorkFile
     );
-    
-    // Set bitcoin address for pool mode
-    if (!bitcoinAddress.empty()) {
-        v->SetBitcoinAddress(bitcoinAddress);
-    }
 
     if (checkFlag) {
-        v->Check();  
+        v->Check();
         exit(0);
     } else if (!checkWorkFile.empty()) {
         v->CheckWorkFile(nbCPUThread, checkWorkFile);
@@ -226,10 +204,8 @@ int main(int argc, char* argv[]) {
         exit(-1);
     } else if (!configFile.empty() && !v->ParseConfigFile(configFile)) {
         exit(-1);
-    } else if (serverMode && !poolMode) {
+    } else if (serverMode) {
         v->RunServer();
-    } else if (poolMode && serverIP.empty()) {
-        v->RunPoolServer();
     } else {
         v->Run(nbCPUThread, gpuId, gridSize);
     }
