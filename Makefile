@@ -30,7 +30,7 @@ endif
 ifdef gpu
 $(OBJDIR)/math/gpu/engine.o: math/gpu/engine.cu
 	@mkdir -p $(dir $@)
-	$(NVCC) -maxrregcount=0 --ptxas-options=-v --compile --compiler-options -fPIC -ccbin $(CXXCUDA) -m64 -O3 -I$(CUDA)/include -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/math/gpu/engine.o -c math/gpu/engine.cu
+	$(NVCC) -maxrregcount=0 --ptxas-options=-v --compile --compiler-options -fPIC -ccbin $(CXXCUDA) -m64 -O3 -I. -Icore -Imemory -Istorage -Imath -Imath/cpu -Imath/gpu -I$(CUDA)/include -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/math/gpu/engine.o -c math/gpu/engine.cu
 endif
 $(OBJDIR)/%.o : %.cpp
 	@mkdir -p $(dir $@)

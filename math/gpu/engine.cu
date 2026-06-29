@@ -1,10 +1,11 @@
+#include <cuda.h>
+#include <cuda_runtime.h>
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "engine.h"
-#include <cuda.h>
-#include <cuda_runtime.h>
 
 #include <stdint.h>
 #include "timer.h"
