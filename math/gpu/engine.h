@@ -2,8 +2,8 @@
 #define GPUENGINEH
 
 #include <vector>
-#include "../Constants.h"
-#include "../SECPK1/SECP256k1.h"
+#include "constants.h"
+#include "secp256k1.h"
 
 #define KSIZE 12
 #define ITEM_SIZE   76

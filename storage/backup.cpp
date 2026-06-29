@@ -1,14 +1,18 @@
-#include "Kangaroo.h"
+#include "kangaroo.h"
 #include <fstream>
-#include "SECPK1/IntGroup.h"
-#include "Timer.h"
+#include "intgroup.h"
+#include "timer.h"
+#include "workfile.h"
 #include <string.h>
 #include <math.h>
 #include <algorithm>
 #include <pthread.h>
 #include <sys/stat.h>
+#include <filesystem>
 
 using namespace std;
+using namespace workfile;
+namespace fs = std::filesystem;
 
 int Kangaroo::FSeek(FILE* stream,uint64_t pos) {
   return fseeko(stream,pos,SEEK_SET);
@@ -19,27 +23,23 @@ uint64_t Kangaroo::FTell(FILE* stream) {
 }
 
 bool Kangaroo::IsEmpty(std::string fileName) {
-  FILE *pFile = fopen(fileName.c_str(),"r");
-  if(pFile==NULL) {
+  std::error_code ec;
+  uint64_t size = fs::file_size(fileName, ec);
+  if(ec) {
     ::printf("OpenPart: Cannot open %s for reading\n",fileName.c_str());
-    ::printf("%s\n",::strerror(errno));
+    ::printf("%s\n",ec.message().c_str());
     ::exit(0);
   }
-  fseek(pFile,0,SEEK_END);
-  uint32_t size = ftell(pFile);
-  fclose(pFile);
-  return size==0;
+  return size == 0;
 }
 
 int Kangaroo::IsDir(string dirName) {
-  bool isDir = 0;
-  struct stat buffer;
-  if(stat(dirName.c_str(),&buffer) != 0) {
+  std::error_code ec;
+  if(!fs::exists(dirName, ec)) {
     ::printf("%s not found\n",dirName.c_str());
     return -1;
   }
-  isDir = (buffer.st_mode & S_IFDIR) != 0;
-  return isDir;
+  return fs::is_directory(dirName, ec) ? 1 : 0;
 }
 
 FILE *Kangaroo::ReadHeader(std::string fileName, uint32_t *version, int type) {
@@ -69,10 +69,10 @@ FILE *Kangaroo::ReadHeader(std::string fileName, uint32_t *version, int type) {
 
   if(head!=type) {
     if(head==HEADK) {
-      fread(&nbLoadedWalk,sizeof(uint64_t),1,f);
+      readExact(f,&nbLoadedWalk,sizeof(uint64_t));
       ::printf("ReadHeader: %s is a kangaroo only file [2^%.2f kangaroos]\n",fileName.c_str(),log2((double)nbLoadedWalk));
     } if(head == HEADKS) {
-      fread(&nbLoadedWalk,sizeof(uint64_t),1,f);
+      readExact(f,&nbLoadedWalk,sizeof(uint64_t));
       ::printf("ReadHeader: %s is a compressed kangaroo only file [2^%.2f kangaroos]\n",fileName.c_str(),log2((double)nbLoadedWalk));
     } else if(head==HEADW) {
       ::printf("ReadHeader: %s is a work file, kangaroo only file expected\n",fileName.c_str());
@@ -85,31 +85,47 @@ FILE *Kangaroo::ReadHeader(std::string fileName, uint32_t *version, int type) {
   return f;
 }
 
+bool Kangaroo::LoadWorkPayload(const std::string& fileName,const char* label,uint32_t* version,FILE** fOut,WorkFilePayload& payload) {
+  FILE* f = ReadHeader(fileName,version,HEADW);
+  if(f == NULL) {
+    return false;
+  }
+
+  if(!readWorkPayload(f,payload)) {
+    ::printf("%s: Cannot read work payload from %s\n",label,fileName.c_str());
+    ::fclose(f);
+    return false;
+  }
+
+  if(!secp->EC(payload.key)) {
+    ::printf("%s: key does not lie on elliptic curve\n",label);
+    ::fclose(f);
+    return false;
+  }
+
+  if(fOut != NULL) {
+    *fOut = f;
+  } else {
+    ::fclose(f);
+  }
+  return true;
+}
+
 bool Kangaroo::LoadWork(string &fileName) {
   double t0 = Timer::getTick();
   ::printf("Loading: %s\n",fileName.c_str());
   if(!clientMode) {
-    fRead = ReadHeader(fileName,NULL,HEADW);
-    if(fRead == NULL)
+    WorkFilePayload payload;
+    fRead = NULL;
+    if(!LoadWorkPayload(fileName,"LoadWork",NULL,&fRead,payload))
       return false;
     keysToSearch.clear();
-    Point key;
-    // Read global param
-    uint32_t dp;
-    ::fread(&dp,sizeof(uint32_t),1,fRead);
-    if(initDPSize < 0) initDPSize = dp;
-    ::fread(&rangeStart.bits64,32,1,fRead); rangeStart.bits64[4] = 0;
-    ::fread(&rangeEnd.bits64,32,1,fRead); rangeEnd.bits64[4] = 0;
-    ::fread(&key.x.bits64,32,1,fRead); key.x.bits64[4] = 0;
-    ::fread(&key.y.bits64,32,1,fRead); key.y.bits64[4] = 0;
-    ::fread(&offsetCount,sizeof(uint64_t),1,fRead);
-    ::fread(&offsetTime,sizeof(double),1,fRead);
-    key.z.SetInt32(1);
-    if(!secp->EC(key)) {
-      ::printf("LoadWork: key does not lie on elliptic curve\n");
-      return false;
-    }
-    keysToSearch.push_back(key);
+    if(initDPSize < 0) initDPSize = payload.dpSize;
+    rangeStart = payload.rangeStart;
+    rangeEnd = payload.rangeEnd;
+    offsetCount = payload.totalCount;
+    offsetTime = payload.totalTime;
+    keysToSearch.push_back(payload.key);
     ::printf("Start:%s\n",rangeStart.GetBase16().c_str());
     ::printf("Stop :%s\n",rangeEnd.GetBase16().c_str());
     ::printf("Keys :%d\n",(int)keysToSearch.size());
@@ -118,12 +134,13 @@ bool Kangaroo::LoadWork(string &fileName) {
     hashTable.LoadTable(fRead);
   } else {
     // In client mode, config come from the server, file has only kangaroo
+    fRead = NULL;
     fRead = ReadHeader(fileName,NULL,HEADK);
     if(fRead == NULL)
       return false;
   }
   // Read number of walk
-  fread(&nbLoadedWalk,sizeof(uint64_t),1,fRead);
+  readExact(fRead,&nbLoadedWalk,sizeof(uint64_t));
   double t1 = Timer::getTick();
   ::printf("LoadWork: [HashTable %s] [%s]\n",hashTable.GetSizeInfo().c_str(),GetTimeStr(t1 - t0).c_str());
   return true;
@@ -134,9 +151,9 @@ void Kangaroo::FetchWalks(uint64_t nbWalk,Int *x,Int *y,Int *d) {
   int64_t n = 0;
   ::printf("Fetch kangaroos: %.0f\n",(double)nbWalk);
   for(n = 0; n < (int64_t)nbWalk && nbLoadedWalk>0; n++) {
-    ::fread(&x[n].bits64,32,1,fRead); x[n].bits64[4] = 0;
-    ::fread(&y[n].bits64,32,1,fRead); y[n].bits64[4] = 0;
-    ::fread(&d[n].bits64,32,1,fRead); d[n].bits64[4] = 0;
+    readInt256(fRead,x[n]);
+    readInt256(fRead,y[n]);
+    readInt256(fRead,d[n]);
     nbLoadedWalk--;
   }
   if(n<(int64_t)nbWalk) {
@@ -212,13 +229,13 @@ void Kangaroo::FectchKangaroos(TH_PARAM *threads) {
 
     // Fetch loaded walk
     for(int i = 0; i < nbCPUThread; i++) {
-      threads[i].px = new Int[CPU_GRP_SIZE];
-      threads[i].py = new Int[CPU_GRP_SIZE];
-      threads[i].distance = new Int[CPU_GRP_SIZE];
+      threads[i].px.resize(CPU_GRP_SIZE);
+      threads[i].py.resize(CPU_GRP_SIZE);
+      threads[i].distance.resize(CPU_GRP_SIZE);
       if(!saveKangarooByServer)
-        FetchWalks(CPU_GRP_SIZE,threads[i].px,threads[i].py,threads[i].distance);
+        FetchWalks(CPU_GRP_SIZE,threads[i].px.data(),threads[i].py.data(),threads[i].distance.data());
       else
-        FetchWalks(CPU_GRP_SIZE,kangs,threads[i].px,threads[i].py,threads[i].distance);
+        FetchWalks(CPU_GRP_SIZE,kangs,threads[i].px.data(),threads[i].py.data(),threads[i].distance.data());
     }
     ::printf("Done\n");
 #ifdef WITHGPU
@@ -226,19 +243,19 @@ void Kangaroo::FectchKangaroos(TH_PARAM *threads) {
       ::printf(".");
       int id = nbCPUThread + i;
       uint64_t n = threads[id].nbKangaroo;
-      threads[id].px = new Int[n];
-      threads[id].py = new Int[n];
-      threads[id].distance = new Int[n];
+      threads[id].px.resize(n);
+      threads[id].py.resize(n);
+      threads[id].distance.resize(n);
       if(!saveKangarooByServer)
           FetchWalks(n,
-            threads[id].px,
-            threads[id].py,
-            threads[id].distance);
+            threads[id].px.data(),
+            threads[id].py.data(),
+            threads[id].distance.data());
       else
           FetchWalks(n,kangs,
-            threads[id].px,
-            threads[id].py,
-            threads[id].distance);
+            threads[id].px.data(),
+            threads[id].py.data(),
+            threads[id].distance.data());
     }
 #endif
     double eFetch = Timer::getTick();
@@ -265,14 +282,18 @@ bool Kangaroo::SaveHeader(string fileName,FILE* f,int type,uint64_t totalCount,d
   ::fwrite(&version,sizeof(uint32_t),1,f);
 
   if(type==HEADW) {
-    // Save global param
-    ::fwrite(&dpSize,sizeof(uint32_t),1,f);
-    ::fwrite(&rangeStart.bits64,32,1,f);
-    ::fwrite(&rangeEnd.bits64,32,1,f);
-    ::fwrite(&keysToSearch[keyIdx].x.bits64,32,1,f);
-    ::fwrite(&keysToSearch[keyIdx].y.bits64,32,1,f);
-    ::fwrite(&totalCount,sizeof(uint64_t),1,f);
-    ::fwrite(&totalTime,sizeof(double),1,f);
+    WorkFilePayload payload;
+    payload.dpSize = dpSize;
+    payload.rangeStart = rangeStart;
+    payload.rangeEnd = rangeEnd;
+    payload.key = keysToSearch[keyIdx];
+    payload.totalCount = totalCount;
+    payload.totalTime = totalTime;
+    if(!writeWorkPayload(f,payload)) {
+      ::printf("SaveHeader: Cannot write payload to %s\n",fileName.c_str());
+      ::printf("%s\n",::strerror(errno));
+      return false;
+    }
   }
   return true;
 }
@@ -390,9 +411,9 @@ void Kangaroo::SaveWork(uint64_t totalCount,double totalTime,TH_PARAM *threads,i
 
     for(int i = 0; i < nbThread; i++) {
       for(uint64_t n = 0; n < threads[i].nbKangaroo; n++) {
-        ::fwrite(&threads[i].px[n].bits64,32,1,f);
-        ::fwrite(&threads[i].py[n].bits64,32,1,f);
-        ::fwrite(&threads[i].distance[n].bits64,32,1,f);
+        writeInt256(f,threads[i].px[n]);
+        writeInt256(f,threads[i].py[n]);
+        writeInt256(f,threads[i].distance[n]);
         pointPrint++;
         if(pointPrint>point) {
           ::printf(".");
@@ -433,33 +454,10 @@ void Kangaroo::WorkInfo(std::string &fName) {
   ::printf("Loading: %s\n",fileName.c_str());
 
   uint32_t version;
-  FILE *f1 = ReadHeader(fileName,&version,HEADW);
-  if(f1 == NULL)
+  WorkFilePayload payload;
+  FILE *f1 = NULL;
+  if(!LoadWorkPayload(fileName,"WorkInfo",&version,&f1,payload))
     return;
-
-  int fd = fileno(f1);
-  uint32_t dp1;
-  Point k1;
-  uint64_t count1;
-  double time1;
-  Int RS1;
-  Int RE1;
-
-  // Read global param
-  ::fread(&dp1,sizeof(uint32_t),1,f1);
-  ::fread(&RS1.bits64,32,1,f1); RS1.bits64[4] = 0;
-  ::fread(&RE1.bits64,32,1,f1); RE1.bits64[4] = 0;
-  ::fread(&k1.x.bits64,32,1,f1); k1.x.bits64[4] = 0;
-  ::fread(&k1.y.bits64,32,1,f1); k1.y.bits64[4] = 0;
-  ::fread(&count1,sizeof(uint64_t),1,f1);
-  ::fread(&time1,sizeof(double),1,f1);
-
-  k1.z.SetInt32(1);
-  if(!secp->EC(k1)) {
-    ::printf("WorkInfo: key1 does not lie on elliptic curve\n");
-    fclose(f1);
-    return;
-  }
 
   // Read hashTable
   if(isDir) {
@@ -473,14 +471,14 @@ void Kangaroo::WorkInfo(std::string &fName) {
   }
 
   ::printf("Version   : %d\n",version);
-  ::printf("DP bits   : %d\n",dp1);
-  ::printf("Start     : %s\n",RS1.GetBase16().c_str());
-  ::printf("Stop      : %s\n",RE1.GetBase16().c_str());
-  ::printf("Key       : %s\n",secp->GetPublicKeyHex(true,k1).c_str());
-  ::printf("Count     : %" PRId64 " 2^%.3f\n",count1,log2(count1));
-  ::printf("Time      : %s\n",GetTimeStr(time1).c_str());
+  ::printf("DP bits   : %d\n",payload.dpSize);
+  ::printf("Start     : %s\n",payload.rangeStart.GetBase16().c_str());
+  ::printf("Stop      : %s\n",payload.rangeEnd.GetBase16().c_str());
+  ::printf("Key       : %s\n",secp->GetPublicKeyHex(true,payload.key).c_str());
+  ::printf("Count     : %" PRId64 " 2^%.3f\n",payload.totalCount,log2(payload.totalCount));
+  ::printf("Time      : %s\n",GetTimeStr(payload.totalTime).c_str());
   hashTable.PrintInfo();
-  fread(&nbLoadedWalk,sizeof(uint64_t),1,f1);
+  readExact(f1,&nbLoadedWalk,sizeof(uint64_t));
   ::printf("Kangaroos : %" PRId64 " 2^%.3f\n",nbLoadedWalk,log2(nbLoadedWalk));
   fclose(f1);
 }

@@ -2,15 +2,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "GPUEngine.h"
+#include "engine.h"
 #include <cuda.h>
 #include <cuda_runtime.h>
 
 #include <stdint.h>
-#include "../Timer.h"
+#include "timer.h"
 
-#include "GPUMath.h"
-#include "GPUCompute.h"
+#include "kernel.h"
+#include "compute.h"
 
 __global__ void comp_kangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t *found,uint64_t dpMask) {
   int xPtr = (blockIdx.x*blockDim.x*GPU_GRP_SIZE) * KSIZE; // x[4] , y[4] , d[2], lastJump

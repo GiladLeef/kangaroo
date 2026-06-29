@@ -1,6 +1,6 @@
-#include "Kangaroo.h"
-#include "Timer.h"
-#include "SECPK1/SECP256k1.h"
+#include "kangaroo.h"
+#include "timer.h"
+#include "secp256k1.h"
 #include <fstream>
 #include <string>
 #include <vector>
@@ -53,13 +53,12 @@ int getInt(const string& name, const string& v) {
     }
 }
 
-double getDouble(const string& name, const string& v) {
-    try {
-        return stod(v);
-    } catch (const invalid_argument&) {
-        cerr << "Invalid " << name << " argument, number expected" << endl;
-        exit(-1);
+string nextArgOrDie(int& a, int argc, char* argv[], const string& opt) {
+    if (a + 1 >= argc) {
+        cerr << opt << " missing argument" << endl;
+        exit(0);
     }
+    return argv[++a];
 }
 
 void getInts(const string& name, vector<int>& tokens, const string& text, char sep) {
@@ -104,63 +103,27 @@ int main(int argc, char* argv[]) {
     for (int a = 1; a < argc; ++a) {
         string arg = argv[a];
         if (arg == "-t") {
-            if (a + 1 >= argc) {
-                cerr << "-t missing argument" << endl;
-                exit(0);
-            }
-            nbCPUThread = getInt("nbCPUThread", argv[++a]);
+            nbCPUThread = getInt("nbCPUThread", nextArgOrDie(a, argc, argv, "-t"));
         } else if (arg == "-d") {
-            if (a + 1 >= argc) {
-                cerr << "-d missing argument" << endl;
-                exit(0);
-            }
-            dp = getInt("dpSize", argv[++a]);
+            dp = getInt("dpSize", nextArgOrDie(a, argc, argv, "-d"));
         } else if (arg == "-w") {
-            if (a + 1 >= argc) {
-                cerr << "-w missing argument" << endl;
-                exit(0);
-            }
-            workFile = argv[++a];
+            workFile = nextArgOrDie(a, argc, argv, "-w");
         } else if (arg == "-i") {
-            if (a + 1 >= argc) {
-                cerr << "-i missing argument" << endl;
-                exit(0);
-            }
-            iWorkFile = argv[++a];
+            iWorkFile = nextArgOrDie(a, argc, argv, "-i");
         } else if (arg == "-gpu") {
             gpuEnable = true;
         } else if (arg == "-gpuId") {
-            if (a + 1 >= argc) {
-                cerr << "-gpuId missing argument" << endl;
-                exit(0);
-            }
-            getInts("gpuId", gpuId, argv[++a], ',');
+            getInts("gpuId", gpuId, nextArgOrDie(a, argc, argv, "-gpuId"), ',');
         } else if (arg == "-g") {
-            if (a + 1 >= argc) {
-                cerr << "-g missing argument" << endl;
-                exit(0);
-            }
-            getInts("gridSize", gridSize, argv[++a], ',');
+            getInts("gridSize", gridSize, nextArgOrDie(a, argc, argv, "-g"), ',');
         } else if (arg == "-o") {
-            if (a + 1 >= argc) {
-                cerr << "-o missing argument" << endl;
-                exit(0);
-            }
-            outputFile = argv[++a];
+            outputFile = nextArgOrDie(a, argc, argv, "-o");
         } else if (arg == "-s") {
             serverMode = true;
         } else if (arg == "-c") {
-            if (a + 1 >= argc) {
-                cerr << "-c missing argument" << endl;
-                exit(0);
-            }
-            serverIP = argv[++a];
+            serverIP = nextArgOrDie(a, argc, argv, "-c");
         } else if (arg == "-sp") {
-            if (a + 1 >= argc) {
-                cerr << "-sp missing argument" << endl;
-                exit(0);
-            }
-            port = getInt("serverPort", argv[++a]);
+            port = getInt("serverPort", nextArgOrDie(a, argc, argv, "-sp"));
         } else if (arg == "-v") {
             exit(0);
         } else if (arg == "-check") {

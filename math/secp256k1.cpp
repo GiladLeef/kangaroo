@@ -1,6 +1,8 @@
-#include "SECP256k1.h"
-#include "IntGroup.h"
+#include "secp256k1.h"
+#include "intgroup.h"
 #include <string.h>
+#include <iomanip>
+#include <sstream>
 
 Secp256K1::Secp256K1() {}
 
@@ -62,25 +64,24 @@ Point Secp256K1::ComputePublicKey(Int *privKey,bool reduce) {
 std::vector<Point> Secp256K1::ComputePublicKeys(std::vector<Int> &privKeys) {
     std::vector<Point> pts;
     IntGroup grp((int)privKeys.size());
-    Int *inv = new Int[privKeys.size()];
+    std::vector<Int> inv(privKeys.size());
     pts.reserve(privKeys.size());
 
-    for(int i = 0; i < privKeys.size(); i++) {
+    for(size_t i = 0; i < privKeys.size(); i++) {
         Point P = ComputePublicKey(&privKeys[i], false);
         inv[i].Set(&P.z);
         pts.push_back(P);
     }
 
-    grp.Set(inv);
+    grp.Set(inv.data());
     grp.ModInv();
 
-    for(int i = 0; i < privKeys.size(); i++) {
-        pts[i].x.ModMulK1(inv + i);
-        pts[i].y.ModMulK1(inv + i);
+    for(size_t i = 0; i < privKeys.size(); i++) {
+        pts[i].x.ModMulK1(inv.data() + i);
+        pts[i].y.ModMulK1(inv.data() + i);
         pts[i].z.SetInt32(1);
     }
 
-    delete[] inv;
     return pts;
 }
 
@@ -90,23 +91,26 @@ Point Secp256K1::NextKey(Point &key) {
   return AddDirect(key,G);
 }
 
-uint8_t Secp256K1::GetByte(std::string &str, int idx) {
-  char tmp[3];
-  int  val;
-  tmp[0] = str.data()[2 * idx];
-  tmp[1] = str.data()[2 * idx + 1];
-  tmp[2] = 0;
+uint8_t Secp256K1::GetByte(const std::string &str, int idx) {
+  auto hexValue = [](char c) -> int {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return 10 + (c - 'a');
+    if (c >= 'A' && c <= 'F') return 10 + (c - 'A');
+    return -1;
+  };
 
-  if (sscanf(tmp, "%X", &val) != 1) {
+  int hi = hexValue(str.data()[2 * idx]);
+  int lo = hexValue(str.data()[2 * idx + 1]);
+  if (hi < 0 || lo < 0) {
     printf("ParsePublicKeyHex: Error invalid public key specified (unexpected hexadecimal digit)\n");
     exit(-1);
   }
 
-  return (uint8_t)val;
+  return (uint8_t)((hi << 4) | lo);
 
 }
 
-bool Secp256K1::ParsePublicKeyHex(std::string str,Point &ret,bool &isCompressed) {
+bool Secp256K1::ParsePublicKeyHex(const std::string& str,Point &ret,bool &isCompressed) {
   ret.Clear();
   if (str.length() < 2) {
     printf("ParsePublicKeyHex: Error invalid public key specified (66 or 130 character length)\n");
@@ -169,8 +173,8 @@ bool Secp256K1::ParsePublicKeyHex(std::string str,Point &ret,bool &isCompressed)
 
 std::string Secp256K1::GetPublicKeyHex(bool compressed, Point &pubKey) {
   unsigned char publicKeyBytes[128];
-  char tmp[3];
-  std::string ret;
+  std::ostringstream ret;
+  ret << std::uppercase << std::hex << std::setfill('0');
 
   if (!compressed) {
     // Full public key
@@ -179,8 +183,7 @@ std::string Secp256K1::GetPublicKeyHex(bool compressed, Point &pubKey) {
     pubKey.y.Get32Bytes(publicKeyBytes + 33);
 
     for (int i = 0; i < 65; i++) {
-      sprintf(tmp, "%02X", (int)publicKeyBytes[i]);
-      ret.append(tmp);
+      ret << std::setw(2) << static_cast<int>(publicKeyBytes[i]);
     }
   } else {
     // Compressed public key
@@ -188,12 +191,11 @@ std::string Secp256K1::GetPublicKeyHex(bool compressed, Point &pubKey) {
     pubKey.x.Get32Bytes(publicKeyBytes + 1);
 
     for (int i = 0; i < 33; i++) {
-      sprintf(tmp, "%02X", (int)publicKeyBytes[i]);
-      ret.append(tmp);
+      ret << std::setw(2) << static_cast<int>(publicKeyBytes[i]);
     }
 
   }
-  return ret;
+  return ret.str();
 }
 Point Secp256K1::AddDirect(Point &p1, Point &p2) {
     Int dy, dx, s, p, temp;

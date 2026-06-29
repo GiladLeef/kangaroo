@@ -1,11 +1,16 @@
 #include <x86intrin.h>
 
-#include "Int.h"
-#include "IntGroup.h"
+#include "int.h"
+#include "intgroup.h"
 #include <string.h>
 #include <math.h>
 #include <emmintrin.h>
-#include "../Timer.h"
+#include "timer.h"
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <iomanip>
+#include <sstream>
 
 #define MAX(x,y) (((x)>(y))?(x):(y))
 #define MIN(x,y) (((x)<(y))?(x):(y))
@@ -15,7 +20,7 @@ Int _ONE((uint64_t)1);
 Int::Int() {
 }
 
-Int::Int(Int *a) {
+Int::Int(const Int *a) {
   if(a) Set(a);
   else CLEAR();
 }
@@ -40,22 +45,18 @@ Int::Int(uint64_t u64) {
 
 
 void Int::CLEAR() {
-
-  memset(bits64,0, NB64BLOCK*8);
+  std::fill_n(bits64, NB64BLOCK, 0ULL);
 
 }
 
 void Int::CLEARFF() {
-
-  memset(bits64, 0xFF, NB64BLOCK * 8);
+  std::fill_n(bits64, NB64BLOCK, 0xFFFFFFFFFFFFFFFFULL);
 
 }
 
 
-void Int::Set(Int *a) {
-
-  for (int i = 0; i<NB64BLOCK; i++)
-  	bits64[i] = a->bits64[i];
+void Int::Set(const Int *a) {
+  std::copy_n(a->bits64, NB64BLOCK, bits64);
 
 }
 
@@ -252,7 +253,7 @@ bool Int::IsLowerOrEqual(Int *a) {
 
 }
 
-bool Int::IsEqual(Int *a) {
+bool Int::IsEqual(const Int *a) const {
 
 return
 
@@ -915,7 +916,7 @@ void Int::GCD(Int *a) {
 }
 
 
-void Int::SetBase10(char *value) {  
+void Int::SetBase10(const char *value) {  
 
   CLEAR();
   Int pw((uint64_t)1);
@@ -932,7 +933,7 @@ void Int::SetBase10(char *value) {
 }
 
 
-void  Int::SetBase16(char *value) {  
+void  Int::SetBase16(const char *value) {  
   SetBaseN(16,"0123456789ABCDEF",value);
 }
 
@@ -948,40 +949,33 @@ std::string Int::GetBase16() {
 
 
 std::string Int::GetBlockStr() {
-	
-	char tmp[256];
-	char bStr[256];
-	tmp[0] = 0;
-	for (int i = NB32BLOCK-3; i>=0 ; i--) {
-	  sprintf(bStr, "%08X", bits[i]);
-	  strcat(tmp, bStr);
-	  if(i!=0) strcat(tmp, " ");
-	}
-	return std::string(tmp);
+  std::ostringstream out;
+  out << std::uppercase << std::hex << std::setfill('0');
+  for (int i = NB32BLOCK-3; i>=0 ; i--) {
+    out << std::setw(8) << bits[i];
+    if(i!=0) out << ' ';
+  }
+  return out.str();
 }
 
 
 std::string Int::GetC64Str(int nbDigit) {
-
-  char tmp[256];
-  char bStr[256];
-  tmp[0] = '{';
-  tmp[1] = 0;
+  std::ostringstream out;
+  out << '{';
   for (int i = 0; i< nbDigit; i++) {
     if (bits64[i] != 0) {
-      sprintf(bStr, "0x%" PRIx64  "ULL", bits64[i]);
+      out << "0x" << std::hex << bits64[i] << "ULL";
     } else {
-      sprintf(bStr, "0ULL");
+      out << "0ULL";
     }
-    strcat(tmp, bStr);
-    if (i != nbDigit -1) strcat(tmp, ",");
+    if (i != nbDigit -1) out << ',';
   }
-  strcat(tmp,"}");
-  return std::string(tmp);
+  out << '}';
+  return out.str();
 }
 
 
-void  Int::SetBaseN(int n,char *charset,char *value) {
+void  Int::SetBaseN(int n,const char *charset,const char *value) {
 
   CLEAR();
 
@@ -991,7 +985,7 @@ void  Int::SetBaseN(int n,char *charset,char *value) {
 
   int lgth = (int)strlen(value);
   for(int i=lgth-1;i>=0;i--) {
-    char *p = strchr(charset,toupper(value[i]));
+    const char *p = strchr(charset,std::toupper(static_cast<unsigned char>(value[i])));
     if(!p) {
       printf("Invalid charset !!\n");
       return;
@@ -1007,7 +1001,7 @@ void  Int::SetBaseN(int n,char *charset,char *value) {
 }
 
 
-std::string Int::GetBaseN(int n,char *charset) {
+std::string Int::GetBaseN(int n,const char *charset) {
 
   std::string ret;
 
@@ -1016,8 +1010,7 @@ std::string Int::GetBaseN(int n,char *charset) {
   if (isNegative) N.Neg();
 
   // TODO: compute max digit
-  unsigned char digits[1024];
-  memset(digits, 0, sizeof(digits));
+  std::array<unsigned char, 1024> digits{};
 
   int digitslen = 1;
   for (int i = 0; i < NB64BLOCK * 8; i++) {
@@ -1060,22 +1053,16 @@ int Int::GetBit(uint32_t n) {
 
 
 std::string Int::GetBase2() {
-
-  char ret[1024];
-  int k=0;
+  std::ostringstream out;
 
   for(int i=0;i<NB32BLOCK-1;i++) {
     unsigned int mask=0x80000000;
     for(int j=0;j<32;j++) {
-      if(bits[i]&mask) ret[k]='1';
-      else             ret[k]='0';
-      k++;
+      out << ((bits[i]&mask) ? '1' : '0');
       mask=mask>>1;
     }
   }
-  ret[k]=0;
-
-  return std::string(ret);
+  return out.str();
 
 }
 

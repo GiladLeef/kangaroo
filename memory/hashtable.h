@@ -3,7 +3,7 @@
 
 #include <string>
 #include <vector>
-#include "SECPK1/Point.h"
+#include "point.h"
 
 #define HASH_SIZE_BIT 18
 #define HASH_SIZE (1<<HASH_SIZE_BIT)
@@ -22,8 +22,6 @@ union int256_s {
 
 typedef union int256_s int256_t;
 
-#define safe_free(x) if(x) {free(x);x=NULL;}
-
 typedef struct {
 
   int256_t  x;    // Position of kangaroo (256bit LSB)
@@ -31,13 +29,10 @@ typedef struct {
 
 } ENTRY;
 
-typedef struct {
-
-  uint32_t   nbItem;
-  uint32_t   maxItem;
-  ENTRY    **items;
-
-} HASH_ENTRY;
+struct HASH_ENTRY {
+  uint32_t nbItem = 0;
+  std::vector<ENTRY> items;
+};
 
 class HashTable {
 
@@ -46,8 +41,10 @@ public:
   HashTable();
   int Add(Int *x,Int *d,uint32_t type);
   int Add(uint64_t h,int256_t *x,int256_t *d);
-  int Add(uint64_t h,ENTRY *e);
+  int Add(uint64_t h,const ENTRY &e);
   uint64_t GetNbItem();
+  uint32_t GetBucketSize(uint32_t h) const;
+  const ENTRY* GetEntry(uint32_t h,uint32_t i) const;
   void Reset();
   std::string GetSizeInfo();
   void PrintInfo();
@@ -55,7 +52,6 @@ public:
   void SaveTable(FILE* f,uint32_t from,uint32_t to,bool printPoint=true);
   void LoadTable(FILE *f);
   void LoadTable(FILE* f,uint32_t from,uint32_t to);
-  void ReAllocate(uint64_t h,uint32_t add);
   void SeekNbItem(FILE* f,bool restorePos = false);
   void SeekNbItem(FILE* f,uint32_t from,uint32_t to);
 
@@ -71,8 +67,8 @@ public:
 
 private:
 
-  ENTRY *CreateEntry(int256_t *x,int256_t *d);
-  static int compare(int256_t *i1,int256_t *i2);
+  static ENTRY CreateEntry(int256_t *x,int256_t *d);
+  static int compare(const int256_t *i1,const int256_t *i2);
   std::string GetStr(int256_t *i);
 
 };

@@ -2,7 +2,7 @@
 #ifndef BIGINTH
 #define BIGINTH
 
-#include "Random.h"
+#include "random.h"
 #include <string>
 #include <inttypes.h>
 
@@ -19,7 +19,7 @@ public:
   Int();
   Int(int64_t i64);
   Int(uint64_t u64);
-  Int(Int *a);
+  Int(const Int *a);
 
   // Op
   void Add(uint64_t a);
@@ -58,7 +58,7 @@ public:
   bool IsGreaterOrEqual(Int *a);
   bool IsLowerOrEqual(Int *a);
   bool IsLower(Int *a);
-  bool IsEqual(Int *a);
+  bool IsEqual(const Int *a) const;
   bool IsZero();
   bool IsOne();
   bool IsStrictPositive();
@@ -124,10 +124,10 @@ public:
 
   // Setter
   void SetInt32(uint32_t value);
-  void Set(Int *a);
-  void SetBase10(char *value);
-  void SetBase16(char *value);
-  void SetBaseN(int n,char *charset,char *value);
+  void Set(const Int *a);
+  void SetBase10(const char *value);
+  void SetBase16(const char *value);
+  void SetBaseN(int n,const char *charset,const char *value);
   void SetByte(int n,unsigned char byte);
   void SetDWord(int n, uint32_t b);
   void SetQWord(int n,uint64_t b);
@@ -146,7 +146,7 @@ public:
   std::string GetBase2();
   std::string GetBase10();
   std::string GetBase16();
-  std::string GetBaseN(int n,char *charset);
+  std::string GetBaseN(int n,const char *charset);
   std::string GetBlockStr();
   std::string GetC64Str(int nbDigit);
 

@@ -1,7 +1,7 @@
 #ifndef SECP256K1H
 #define SECP256K1H
 
-#include "Point.h"
+#include "point.h"
 #include <string>
 #include <vector>
 
@@ -18,7 +18,7 @@ public:
   bool  EC(Point &p);
 
   std::string GetPublicKeyHex(bool compressed, Point &p);
-  bool ParsePublicKeyHex(std::string str,Point &p,bool &isCompressed);
+  bool ParsePublicKeyHex(const std::string& str,Point &p,bool &isCompressed);
 
   Point Add(Point &p1, Point &p2);
   Point Add2(Point &p1, Point &p2);
@@ -33,7 +33,7 @@ public:
 
 private:
 
-  uint8_t GetByte(std::string &str,int idx);
+  uint8_t GetByte(const std::string &str,int idx);
 
   Int GetY(Int x, bool isEven);
   Point GTable[256*32];       // Generator table

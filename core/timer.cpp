@@ -1,13 +1,24 @@
-#include "Timer.h"
+#include "timer.h"
 
 static const char *prefix[] = { "","Kilo","Mega","Giga","Tera","Peta","Hexa" };
 
 #include <random>
+#include <iomanip>
 #include <sstream>
 #include <sys/time.h>
 #include <unistd.h>
 #include <string.h>
 time_t Timer::tickStart;
+
+namespace {
+
+uint8_t randomByte() {
+  static thread_local std::random_device rd;
+  static thread_local std::uniform_int_distribution<int> dis(0, 255);
+  return static_cast<uint8_t>(dis(rd));
+}
+
+}  // namespace
 
 void Timer::Init() {
 
@@ -24,7 +35,11 @@ double Timer::getTick() {
 }
 
 uint32_t Timer::getSeed32() {
-  return ::strtoul(getSeed(4).c_str(),NULL,16);
+  uint32_t seed = 0;
+  for (int i = 0; i < 4; ++i) {
+    seed = (seed << 8) | static_cast<uint32_t>(randomByte());
+  }
+  return seed;
 }
 
 uint32_t Timer::getPID() {
@@ -34,33 +49,24 @@ uint32_t Timer::getPID() {
 }
 
 std::string Timer::getSeed(int size) {
-    std::string ret;
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, 255);
-
-    for (int i = 0; i < size; i++) {
-        ret += static_cast<char>(dis(gen));
-    }
-
     std::stringstream ss;
+    ss << std::hex << std::setfill('0');
     for (int i = 0; i < size; i++) {
-        ss << std::hex << static_cast<int>(ret[i]);
+        ss << std::setw(2) << static_cast<int>(randomByte());
     }
     return ss.str();
 }
 
 std::string Timer::getResult(char *unit, int nbTry, double t0, double t1) {
-
-  char tmp[256];
+  std::ostringstream out;
   int pIdx = 0;
   double nbCallPerSec = (double)nbTry / (t1 - t0);
   while (nbCallPerSec > 1000.0 && pIdx < 5) {
     pIdx++;
     nbCallPerSec = nbCallPerSec / 1000.0;
   }
-  sprintf(tmp, "%.3f %s%s/sec", nbCallPerSec, prefix[pIdx], unit);
-  return std::string(tmp);
+  out << std::fixed << std::setprecision(3) << nbCallPerSec << ' ' << prefix[pIdx] << unit << "/sec";
+  return out.str();
 
 }
 

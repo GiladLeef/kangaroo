@@ -1,3 +1,5 @@
+#include "kernel.h"
+
 // CUDA Kernel main function
 
 __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t *out,uint64_t dpMask) {

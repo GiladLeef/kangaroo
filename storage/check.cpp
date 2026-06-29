@@ -1,7 +1,8 @@
-#include "Kangaroo.h"
+#include "kangaroo.h"
 #include <fstream>
-#include "SECPK1/IntGroup.h"
-#include "Timer.h"
+#include "intgroup.h"
+#include "timer.h"
+#include "workfile.h"
 #include <string>
 #include <vector>
 #include <iostream>
@@ -11,6 +12,7 @@
 #include <cmath>
 #include <cstring>
 using namespace std;
+using namespace workfile;
 
 uint32_t Kangaroo::CheckHash(uint32_t h, uint32_t nbItem, HashTable* hT, FILE* f) {
     bool ok = true;
@@ -27,7 +29,7 @@ uint32_t Kangaroo::CheckHash(uint32_t h, uint32_t nbItem, HashTable* hT, FILE* f
     }
 
     for (uint32_t i = 0; i < nbItem; i++) {
-        const ENTRY* e = hT ? hT->E[h].items[i] : &items[i];
+        const ENTRY* e = hT ? hT->GetEntry(h, i) : &items[i];
         Int dist;
         uint32_t kType;
         HashTable::CalcDistAndType(e->d, &dist, &kType);
@@ -47,7 +49,7 @@ uint32_t Kangaroo::CheckHash(uint32_t h, uint32_t nbItem, HashTable* hT, FILE* f
 
     vector<Point> S = secp->AddDirect(Sp, P);
     for (uint32_t i = 0; i < nbItem; i++) {
-        const ENTRY* e = hT ? hT->E[h].items[i] : &items[i];
+        const ENTRY* e = hT ? hT->GetEntry(h, i) : &items[i];
         uint32_t hC = S[i].x.bits64[2] & HASH_MASK;
         ok = (hC == h) && (S[i].x.bits64[0] == e->x.i64[0]) && (S[i].x.bits64[1] == e->x.i64[1])  && (S[i].x.bits64[2] == e->x.i64[2])  && (S[i].x.bits64[3] == e->x.i64[3]);
         if (!ok) nbWrong++;
@@ -58,7 +60,7 @@ uint32_t Kangaroo::CheckHash(uint32_t h, uint32_t nbItem, HashTable* hT, FILE* f
 
 bool Kangaroo::CheckPartition(TH_PARAM* p) {
     uint32_t part = p->hStart;
-    string pName = string(p->part1Name);
+    const string& pName = p->part1Name;
     ifstream f1(pName + "/header", ios::binary);
     if (!f1.is_open()) return false;
 
@@ -81,8 +83,9 @@ bool Kangaroo::CheckPartition(TH_PARAM* p) {
 bool Kangaroo::CheckWorkFile(TH_PARAM* p) {
     uint32_t nWrong = 0;
     for (uint32_t h = p->hStart; h < p->hStop; h++) {
-        if (hashTable.E[h].nbItem == 0) continue;
-        nWrong += CheckHash(h, hashTable.E[h].nbItem, &hashTable, nullptr);
+        uint32_t nbItem = hashTable.GetBucketSize(h);
+        if (nbItem == 0) continue;
+        nWrong += CheckHash(h, nbItem, &hashTable, nullptr);
     }
     p->hStop = nWrong;
     return true;
@@ -110,44 +113,17 @@ void Kangaroo::CheckPartition(int nbCore,std::string& partName) {
 
   t0 = Timer::getTick();
 
-  FILE* f1 = ReadHeader(partName+"/header",&v1,HEADW);
-  if(f1 == NULL)
+  FILE* f1 = NULL;
+  WorkFilePayload payload;
+  if(!LoadWorkPayload(partName+"/header","CheckPartition",&v1,&f1,payload))
     return;
 
-  uint32_t dp1;
-  Point k1;
-  uint64_t count1;
-  double time1;
-  Int RS1;
-  Int RE1;
-
-  // Read global param
-  ::fread(&dp1,sizeof(uint32_t),1,f1);
-  ::fread(&RS1.bits64,32,1,f1); RS1.bits64[4] = 0;
-  ::fread(&RE1.bits64,32,1,f1); RE1.bits64[4] = 0;
-  ::fread(&k1.x.bits64,32,1,f1); k1.x.bits64[4] = 0;
-  ::fread(&k1.y.bits64,32,1,f1); k1.y.bits64[4] = 0;
-  ::fread(&count1,sizeof(uint64_t),1,f1);
-  ::fread(&time1,sizeof(double),1,f1);
-
-  k1.z.SetInt32(1);
-  if(!secp->EC(k1)) {
-    ::printf("CheckPartition: key1 does not lie on elliptic curve\n");
+  if(!SetSearchContext(payload.rangeStart,payload.rangeEnd,payload.key,"CheckPartition")) {
     ::fclose(f1);
     return;
   }
 
   ::fclose(f1);
-
-  // Set starting parameters
-  keysToSearch.clear();
-  keysToSearch.push_back(k1);
-  keyIdx = 0;
-  collisionInSameHerd = 0;
-  rangeStart.Set(&RS1);
-  rangeEnd.Set(&RE1);
-  InitRange();
-  InitSearchKey();
 
   int l2 = (int)log2(nbCore);
   int nbThread = (int)pow(2.0,l2);
@@ -156,9 +132,8 @@ void Kangaroo::CheckPartition(int nbCore,std::string& partName) {
   ::printf("Thread: %d\n",nbThread);
   ::printf("CheckingPart");
 
-  TH_PARAM* params = (TH_PARAM*)malloc(nbThread * sizeof(TH_PARAM));
-  THREAD_HANDLE* thHandles = (THREAD_HANDLE*)malloc(nbThread * sizeof(THREAD_HANDLE));
-  memset(params,0,nbThread * sizeof(TH_PARAM));
+  std::vector<TH_PARAM> params(nbThread);
+  std::vector<THREAD_HANDLE> thHandles(nbThread);
   uint64_t nbDP = 0;
   uint64_t nbWrong = 0;
 
@@ -171,22 +146,18 @@ void Kangaroo::CheckPartition(int nbCore,std::string& partName) {
       params[i].isRunning = true;
       params[i].hStart = p + i;
       params[i].hStop = 0;
-      params[i].part1Name = strdup(partName.c_str());
-      thHandles[i] = LaunchThread(_checkPartThread,params + i);
+      params[i].part1Name = partName;
+      thHandles[i] = LaunchThread(_checkPartThread,&params[i]);
     }
 
-    JoinThreads(thHandles,nbThread);
+    JoinThreads(thHandles.data(),nbThread);
 
     for(int i = 0; i < nbThread; i++) {
-      free(params[i].part1Name);
       nbDP += params[i].hStart;
       nbWrong += params[i].hStop;
     }
 
   }
-
-  free(params);
-  free(thHandles);
 
   t1 = Timer::getTick();
 
@@ -218,42 +189,15 @@ void Kangaroo::CheckWorkFile(int nbCore,std::string& fileName) {
     
   t0 = Timer::getTick();
 
-  FILE* f1 = ReadHeader(fileName,&v1,HEADW);
-  if(f1 == NULL)
+  FILE* f1 = NULL;
+  WorkFilePayload payload;
+  if(!LoadWorkPayload(fileName,"CheckWorkFile",&v1,&f1,payload))
     return;
 
-  uint32_t dp1;
-  Point k1;
-  uint64_t count1;
-  double time1;
-  Int RS1;
-  Int RE1;
-
-  // Read global param
-  ::fread(&dp1,sizeof(uint32_t),1,f1);
-  ::fread(&RS1.bits64,32,1,f1); RS1.bits64[4] = 0;
-  ::fread(&RE1.bits64,32,1,f1); RE1.bits64[4] = 0;
-  ::fread(&k1.x.bits64,32,1,f1); k1.x.bits64[4] = 0;
-  ::fread(&k1.y.bits64,32,1,f1); k1.y.bits64[4] = 0;
-  ::fread(&count1,sizeof(uint64_t),1,f1);
-  ::fread(&time1,sizeof(double),1,f1);
-
-  k1.z.SetInt32(1);
-  if(!secp->EC(k1)) {
-    ::printf("CheckWorkFile: key1 does not lie on elliptic curve\n");
+  if(!SetSearchContext(payload.rangeStart,payload.rangeEnd,payload.key,"CheckWorkFile")) {
     ::fclose(f1);
     return;
   }
-
-  // Set starting parameters
-  keysToSearch.clear();
-  keysToSearch.push_back(k1);
-  keyIdx = 0;
-  collisionInSameHerd = 0;
-  rangeStart.Set(&RS1);
-  rangeEnd.Set(&RE1);
-  InitRange();
-  InitSearchKey();
 
   int l2 = (int)log2(nbCore);
   int nbThread = (int)pow(2.0,l2);
@@ -263,9 +207,8 @@ void Kangaroo::CheckWorkFile(int nbCore,std::string& fileName) {
   ::printf("Thread: %d\n",nbThread);
   ::printf("Checking");
 
-  TH_PARAM* params = (TH_PARAM*)malloc(nbThread * sizeof(TH_PARAM));
-  THREAD_HANDLE* thHandles = (THREAD_HANDLE*)malloc(nbThread * sizeof(THREAD_HANDLE));
-  memset(params,0,nbThread * sizeof(TH_PARAM));
+  std::vector<TH_PARAM> params(nbThread);
+  std::vector<THREAD_HANDLE> thHandles(nbThread);
 
   int block = HASH_SIZE / 64;
 
@@ -286,9 +229,9 @@ void Kangaroo::CheckWorkFile(int nbCore,std::string& fileName) {
       params[i].isRunning = true;
       params[i].hStart = S + i * stride;
       params[i].hStop = S + (i + 1) * stride;
-      thHandles[i] = LaunchThread(_checkWorkThread,params + i);
+      thHandles[i] = LaunchThread(_checkWorkThread,&params[i]);
     }
-    JoinThreads(thHandles,nbThread);
+    JoinThreads(thHandles.data(),nbThread);
 
     for(int i = 0; i < nbThread; i++)
       nbWrong += params[i].hStop;
@@ -299,8 +242,6 @@ void Kangaroo::CheckWorkFile(int nbCore,std::string& fileName) {
   }
 
   ::fclose(f1);
-  free(params);
-  free(thHandles);
 
   t1 = Timer::getTick();
 

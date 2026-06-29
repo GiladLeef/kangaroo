@@ -1,7 +1,7 @@
 #ifndef INTGROUPH
 #define INTGROUPH
 
-#include "Int.h"
+#include "int.h"
 #include <vector>
 
 class IntGroup {
@@ -16,7 +16,7 @@ public:
 private:
 
 	Int *ints;
-  Int *subp;
+  std::vector<Int> subp;
   int size;
 
 };

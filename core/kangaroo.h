@@ -2,11 +2,12 @@
 #define KANGAROOH
 
 #include <pthread.h>
+#include <array>
 #include <string>
 #include <vector>
 #include <signal.h> 
-#include "Constants.h"
-#include "GPU/GPUEngine.h"
+#include "constants.h"
+#include "engine.h"
 #include <unordered_map>
 #include <unordered_set>
 
@@ -21,9 +22,13 @@ typedef int SOCKET;
 #include <netdb.h>
 #include <netinet/tcp.h>
 
-#include "SECPK1/SECP256k1.h"
-#include "HashTable.h"
-#include "SECPK1/IntGroup.h"
+#include "secp256k1.h"
+#include "hashtable.h"
+#include "intgroup.h"
+
+namespace workfile {
+struct WorkFilePayload;
+}
 
 typedef pthread_t THREAD_HANDLE;
 #define LOCK(mutex)  pthread_mutex_lock(&(mutex));
@@ -45,17 +50,17 @@ typedef struct {
   int  gridSizeY;
   int  gpuId;
 #endif
-  Int *px; // Kangaroo position
-  Int *py; // Kangaroo position
-  Int *distance; // Travelled distance
+  std::vector<Int> px; // Kangaroo position
+  std::vector<Int> py; // Kangaroo position
+  std::vector<Int> distance; // Travelled distance
   
   SOCKET clientSock;
-  char  *clientInfo;
+  std::string clientInfo;
 
   uint32_t hStart;
   uint32_t hStop;
-  char *part1Name;
-  char *part2Name;
+  std::string part1Name;
+  std::string part2Name;
 
 } TH_PARAM;
 
@@ -80,8 +85,7 @@ typedef struct {
 
 // DP cache
 typedef struct {
-  uint32_t nbDP;
-  DP *dp;
+  std::vector<DP> dp;
 } DP_CACHE;
 
 // Work file type
@@ -140,8 +144,10 @@ private:
   void ComputeExpected(double dp,double *op,double *ram,double* overHead = NULL);
   void InitRange();
   void InitSearchKey();
+  bool SetSearchContext(const Int& start,const Int& end,const Point& key,const char* label);
   std::string GetTimeStr(double s);
   bool Output(Int* pk,char sInfo,int sType);
+  bool LoadWorkPayload(const std::string& fileName,const char* label,uint32_t* version,FILE** fOut,workfile::WorkFilePayload& payload);
 
   // Backup stuff
   void SaveWork(std::string fileName,FILE *f,int type,uint64_t totalCount,double totalTime);
@@ -156,8 +162,8 @@ private:
   uint64_t FTell(FILE *stream);
   int IsDir(std::string dirName);
   bool IsEmpty(std::string fileName);
-  static std::string GetPartName(std::string& partName,int i,bool tmpPart);
-  static FILE* OpenPart(std::string& partName,char* mode,int i,bool tmpPart=false);
+  static std::string GetPartName(const std::string& partName,int i,bool tmpPart);
+  static FILE* OpenPart(const std::string& partName,char* mode,int i,bool tmpPart=false);
   uint32_t CheckHash(uint32_t h,uint32_t nbItem,HashTable* hT,FILE* f);
 
   // Network stuff
@@ -173,7 +179,6 @@ private:
   bool GetKangaroosFromServer(std::string& fileName,std::vector<int256_t>& kangs);
 
   pthread_mutex_t  ghMutex;
-  pthread_mutex_t  rngMutex;
   pthread_mutex_t  saveMutex;
   THREAD_HANDLE LaunchThread(void *(*func) (void *), TH_PARAM *p);
 
@@ -189,7 +194,7 @@ private:
   Secp256K1 *secp;
   int  nbGPUThread;
   HashTable hashTable;
-  uint64_t counters[256];
+  std::array<uint64_t, 256> counters;
   int  nbCPUThread;
   double startTime;
 
@@ -244,8 +249,7 @@ private:
   int port;
   std::string lastError;
   std::string serverIp;
-  char *hostInfo;
-  int   hostInfoLength;
+  std::vector<char> hostInfo;
   int   hostAddrType;
   bool  clientMode;
   bool  isConnected;

@@ -1,11 +1,11 @@
-#include "Point.h"
+#include "point.h"
 
 Point::Point() {}
 
 Point::Point(const Point &p) {
-  x.Set((Int *)&p.x);
-  y.Set((Int *)&p.y);
-  z.Set((Int *)&p.z);
+  x.Set(&p.x);
+  y.Set(&p.y);
+  z.Set(&p.z);
 }
 
 Point::Point(Int *cx,Int *cy,Int *cz) {
@@ -33,7 +33,7 @@ void Point::Set(Int *cx, Int *cy,Int *cz) {
 
 Point::~Point() {}
 
-void Point::Set(Point &p) {
+void Point::Set(const Point &p) {
   x.Set(&p.x);
   y.Set(&p.y);
 }
@@ -51,7 +51,7 @@ void Point::Reduce() {
 
 }
 
-bool Point::equals(Point &p) {
+bool Point::equals(const Point &p) const {
   return y.IsEqual(&p.y);
 }
 

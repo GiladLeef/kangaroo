@@ -1,8 +1,11 @@
-#include "Kangaroo.h"
-#include "Timer.h"
+#include "kangaroo.h"
+#include "timer.h"
 #include <string.h>
 #include <math.h>
 #include <algorithm>
+#include <array>
+#include <iomanip>
+#include <sstream>
 #include <pthread.h>
 
 using namespace std;
@@ -57,8 +60,7 @@ uint64_t Kangaroo::getCPUCount() {
 }
 
 string Kangaroo::GetTimeStr(double dTime) {
-
-  char tmp[256];
+  std::ostringstream out;
 
   double nbDay = dTime / 86400.0;
   if (nbDay >= 1) {
@@ -66,11 +68,11 @@ string Kangaroo::GetTimeStr(double dTime) {
     double nbYear = nbDay / 365.0;
     if (nbYear > 1) {
       if (nbYear < 5)
-        sprintf(tmp, "%.1fy", nbYear);
+        out << std::fixed << std::setprecision(1) << nbYear << 'y';
       else
-        sprintf(tmp, "%gy", nbYear);
+        out << std::defaultfloat << nbYear << 'y';
     } else {
-      sprintf(tmp, "%.1fd", nbDay);
+      out << std::fixed << std::setprecision(1) << nbDay << 'd';
     }
 
   } else {
@@ -82,17 +84,20 @@ string Kangaroo::GetTimeStr(double dTime) {
 
     if (nbHour == 0) {
       if (nbMin == 0) {
-        sprintf(tmp, "%02ds", nbSec);
+        out << std::setw(2) << std::setfill('0') << nbSec << 's';
       } else {
-        sprintf(tmp, "%02d:%02d", nbMin, nbSec);
+        out << std::setw(2) << std::setfill('0') << nbMin
+            << ':' << std::setw(2) << std::setfill('0') << nbSec;
       }
     } else {
-      sprintf(tmp, "%02d:%02d:%02d", nbHour, nbMin, nbSec);
+      out << std::setw(2) << std::setfill('0') << nbHour
+          << ':' << std::setw(2) << std::setfill('0') << nbMin
+          << ':' << std::setw(2) << std::setfill('0') << nbSec;
     }
 
   }
 
-  return string(tmp);
+  return out.str();
 
 }
 
@@ -106,19 +111,18 @@ void Kangaroo::ProcessServer() {
     while (!endOfSearch) {
         double t1 = Timer::getTick();
         LOCK(ghMutex);
-        localCache.assign(recvDP.begin(), recvDP.end());
-        recvDP.clear();
+        localCache.swap(recvDP);
         UNLOCK(ghMutex);
 
-        for (const auto& dp : localCache) {
-            for (int j = 0; j < dp.nbDP && !endOfSearch; j++) {
+        for (auto& dp : localCache) {
+            for (size_t j = 0; j < dp.dp.size() && !endOfSearch; j++) {
                 uint64_t h = dp.dp[j].h;
                 if (!AddToTable(h, &dp.dp[j].x, &dp.dp[j].d)) {
                     collisionInSameHerd++;
                 }
             }
-            free(dp.dp);
         }
+        localCache.clear();
 
         double elapsedTime = Timer::getTick() - t1;
         double toSleep = std::max(0.0, SEND_PERIOD - elapsedTime);
@@ -162,15 +166,12 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
 
   // Key rate smoothing filter
 #define FILTER_SIZE 8
-  double lastkeyRate[FILTER_SIZE];
-  double lastGpukeyRate[FILTER_SIZE];
+  std::array<double, FILTER_SIZE> lastkeyRate{};
+  std::array<double, FILTER_SIZE> lastGpukeyRate{};
   uint32_t filterPos = 0;
 
   double keyRate = 0.0;
   double gpuKeyRate = 0.0;
-
-  memset(lastkeyRate,0,sizeof(lastkeyRate));
-  memset(lastGpukeyRate,0,sizeof(lastkeyRate));
 
   // Wait that all threads have started
   while(!hasStarted(params))
@@ -200,6 +201,8 @@ void Kangaroo::Process(TH_PARAM *params,std::string unit) {
     filterPos++;
 
     // KeyRate smoothing
+    avgKeyRate = 0.0;
+    avgGpuKeyRate = 0.0;
     uint32_t nbSample;
     for(nbSample = 0; (nbSample < FILTER_SIZE) && (nbSample < filterPos); nbSample++) {
       avgKeyRate += lastkeyRate[nbSample];

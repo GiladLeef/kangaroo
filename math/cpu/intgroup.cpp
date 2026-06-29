@@ -1,15 +1,13 @@
-#include "IntGroup.h"
+#include "intgroup.h"
 
 using namespace std;
 
 IntGroup::IntGroup(int size) {
   this->size = size;
-  subp = (Int *)malloc(size * sizeof(Int));
+  subp.resize(size);
 }
 
-IntGroup::~IntGroup() {
-  free(subp);
-}
+IntGroup::~IntGroup() = default;
 
 void IntGroup::Set(Int *pts) {
   ints = pts;

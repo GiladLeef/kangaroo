@@ -1,7 +1,7 @@
 #ifndef POINTH
 #define POINTH
 
-#include "Int.h"
+#include "int.h"
 
 class Point {
 
@@ -13,8 +13,8 @@ public:
   Point(const Point &p);
   ~Point();
   bool isZero();
-  bool equals(Point &p);
-  void Set(Point &p);
+  bool equals(const Point &p) const;
+  void Set(const Point &p);
   void Set(Int *cx, Int *cy,Int *cz);
   void Clear();
   void Reduce();

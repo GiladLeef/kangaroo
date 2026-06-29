@@ -1,24 +1,43 @@
-#include "HashTable.h"
+#include "hashtable.h"
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#include <algorithm>
+#include <iomanip>
+#include <sstream>
 
-#define GET(hash,id) E[hash].items[id]
+namespace {
+
+bool ReadBucketHeader(FILE* f, uint32_t& nbItem, uint32_t& maxItem) {
+    return fread(&nbItem, sizeof(uint32_t), 1, f) == 1 &&
+           fread(&maxItem, sizeof(uint32_t), 1, f) == 1;
+}
+
+bool WriteBucketHeader(FILE* f, uint32_t nbItem, uint32_t maxItem) {
+    return fwrite(&nbItem, sizeof(uint32_t), 1, f) == 1 &&
+           fwrite(&maxItem, sizeof(uint32_t), 1, f) == 1;
+}
+
+bool ReadEntry(FILE* f, ENTRY& entry) {
+    return fread(&entry.x, 16, 1, f) == 1 &&
+           fread(&entry.d, 16, 1, f) == 1;
+}
+
+bool WriteEntry(FILE* f, const ENTRY& entry) {
+    return fwrite(&entry.x, 16, 1, f) == 1 &&
+           fwrite(&entry.d, 16, 1, f) == 1;
+}
+
+}  // namespace
 
 HashTable::HashTable() {
-    memset(E,0,sizeof(E));
 }
 
 void HashTable::Reset() {
     for(uint32_t h = 0; h < HASH_SIZE; h++) {
-        if(E[h].items) {
-            for(uint32_t i = 0; i < E[h].nbItem; i++)
-                free(E[h].items[i]);
-        }
-        safe_free(E[h].items);
-        E[h].maxItem = 0;
         E[h].nbItem = 0;
+        std::vector<ENTRY>().swap(E[h].items);
     }
 }
 
@@ -29,27 +48,28 @@ uint64_t HashTable::GetNbItem() {
     return totalItem;
 }
 
-ENTRY *HashTable::CreateEntry(int256_t *x,int256_t *d) {
+uint32_t HashTable::GetBucketSize(uint32_t h) const {
+    return E[h].nbItem;
+}
 
-  ENTRY *e = (ENTRY *)malloc(sizeof(ENTRY));
-  e->x.i64[0] = x->i64[0];
-  e->x.i64[1] = x->i64[1];
-  e->x.i64[2] = x->i64[2];
-  e->x.i64[3] = x->i64[3];
-  e->d.i64[0] = d->i64[0];
-  e->d.i64[1] = d->i64[1];
-  e->d.i64[2] = d->i64[2];
-  e->d.i64[3] = d->i64[3];
+const ENTRY* HashTable::GetEntry(uint32_t h,uint32_t i) const {
+    return &E[h].items[i];
+}
+
+ENTRY HashTable::CreateEntry(int256_t *x,int256_t *d) {
+
+  ENTRY e;
+  e.x.i64[0] = x->i64[0];
+  e.x.i64[1] = x->i64[1];
+  e.x.i64[2] = x->i64[2];
+  e.x.i64[3] = x->i64[3];
+  e.d.i64[0] = d->i64[0];
+  e.d.i64[1] = d->i64[1];
+  e.d.i64[2] = d->i64[2];
+  e.d.i64[3] = d->i64[3];
   return e;
 
 }
-
-#define ADD_ENTRY(entry) {                 \
-  /* Shift the end of the index table */   \
-  for (int i = E[h].nbItem; i > st; i--)   \
-    E[h].items[i] = E[h].items[i - 1];     \
-  E[h].items[st] = entry;                  \
-  E[h].nbItem++;}
 
 void HashTable::Convert(Int *x,Int *d,uint32_t type,uint64_t *h,int256_t *X,int256_t *D) {
     uint64_t sign = 0;
@@ -76,23 +96,17 @@ void HashTable::Convert(Int *x,Int *d,uint32_t type,uint64_t *h,int256_t *X,int2
     D->i64[1] |= type64;
     *h = (x->bits64[2] & HASH_MASK);
 }
-#define AV1() if(pnb1) { ::fread(&e1,32,1,f1); pnb1--; }
-#define AV2() if(pnb2) { ::fread(&e2,32,1,f2); pnb2--; }
-
 int HashTable::MergeH(uint32_t h, FILE* f1, FILE* f2, FILE* fd, uint32_t* nbDP, uint32_t* duplicate, Int* d1, uint32_t* k1, Int* d2, uint32_t* k2) {
     uint32_t nb1, m1, nb2, m2;
     *duplicate = 0;
     *nbDP = 0;
-    fread(&nb1, sizeof(uint32_t), 1, f1);
-    fread(&m1, sizeof(uint32_t), 1, f1);
-    fread(&nb2, sizeof(uint32_t), 1, f2);
-    fread(&m2, sizeof(uint32_t), 1, f2);
+    ReadBucketHeader(f1, nb1, m1);
+    ReadBucketHeader(f2, nb2, m2);
 
     uint32_t nbd = 0;
     uint32_t md = nb1 + nb2;
     if (md == 0) {
-        fwrite(&md, sizeof(uint32_t), 1, fd);
-        fwrite(&md, sizeof(uint32_t), 1, fd);
+        WriteBucketHeader(fd, md, md);
         return ADD_OK;
     }
 
@@ -100,10 +114,18 @@ int HashTable::MergeH(uint32_t h, FILE* f1, FILE* f2, FILE* fd, uint32_t* nbDP, 
     ENTRY e1, e2;
     bool end1 = (nb1 == 0), end2 = (nb2 == 0);
     bool collisionFound = false;
+    auto drainRemaining = [&](FILE* f, uint32_t remaining) {
+        while (remaining > 0) {
+            uint32_t batchSize = std::min(remaining, (uint32_t)1024);
+            fread(&output[nbd], sizeof(ENTRY), batchSize, f);
+            nbd += batchSize;
+            remaining -= batchSize;
+        }
+    };
     
     // Read the first entries if available
-    if (!end1) fread(&e1, 32, 1, f1);
-    if (!end2) fread(&e2, 32, 1, f2);
+    if (!end1) ReadEntry(f1, e1);
+    if (!end2) ReadEntry(f2, e2);
 
     // Merge the two sorted arrays in a single pass
     while (!(end1 && end2)) {
@@ -112,7 +134,7 @@ int HashTable::MergeH(uint32_t h, FILE* f1, FILE* f2, FILE* fd, uint32_t* nbDP, 
             if (comp < 0) {
                 output[nbd++] = e1;
                 end1 = (--nb1 == 0);
-                if (!end1) fread(&e1, 32, 1, f1);
+                if (!end1) ReadEntry(f1, e1);
             } else if (comp == 0) {
                 if((e1.d.i64[0] == e2.d.i64[0]) && (e1.d.i64[1] == e2.d.i64[1]) && 
                    (e1.d.i64[2] == e2.d.i64[2]) && (e1.d.i64[3] == e2.d.i64[3])) {
@@ -127,41 +149,24 @@ int HashTable::MergeH(uint32_t h, FILE* f1, FILE* f2, FILE* fd, uint32_t* nbDP, 
                 end1 = (--nb1 == 0);
                 end2 = (--nb2 == 0);
                 
-                if (!end1) fread(&e1, 32, 1, f1);
-                if (!end2) fread(&e2, 32, 1, f2);
+                if (!end1) ReadEntry(f1, e1);
+                if (!end2) ReadEntry(f2, e2);
             } else {
                 output[nbd++] = e2;
                 end2 = (--nb2 == 0);
-                if (!end2) fread(&e2, 32, 1, f2);
+                if (!end2) ReadEntry(f2, e2);
             }
         } else if (!end1) {
-            uint32_t remaining = nb1;
-            uint32_t batchSize = std::min(remaining, (uint32_t)1024);
-            
-            while (remaining > 0) {
-                batchSize = std::min(remaining, (uint32_t)1024);
-                fread(&output[nbd], 32, batchSize, f1);
-                nbd += batchSize;
-                remaining -= batchSize;
-            }
+            drainRemaining(f1, nb1);
             break;
         } else if (!end2) {
-            uint32_t remaining = nb2;
-            uint32_t batchSize = std::min(remaining, (uint32_t)1024);
-            
-            while (remaining > 0) {
-                batchSize = std::min(remaining, (uint32_t)1024);
-                fread(&output[nbd], 32, batchSize, f2);
-                nbd += batchSize;
-                remaining -= batchSize;
-            }
+            drainRemaining(f2, nb2);
             break;
         }
     }
 
     md = (nbd + 3) / 4 * 4;
-    fwrite(&nbd, sizeof(uint32_t), 1, fd);
-    fwrite(&md, sizeof(uint32_t), 1, fd);
+    WriteBucketHeader(fd, nbd, md);
     fwrite(output.data(), sizeof(ENTRY), nbd, fd);
     *nbDP = nbd;
 
@@ -173,20 +178,12 @@ int HashTable::Add(Int *x, Int *d, uint32_t type) {
     int256_t D;
     uint64_t h;
     Convert(x,d,type,&h,&X,&D);
-    ENTRY* e = CreateEntry(&X,&D);
+    ENTRY e = CreateEntry(&X,&D);
     return Add(h,e);
 }
 
-void HashTable::ReAllocate(uint64_t h, uint32_t add) {
-    E[h].maxItem += add;
-    ENTRY** nitems = (ENTRY**)malloc(sizeof(ENTRY*) * E[h].maxItem);
-    memcpy(nitems,E[h].items,sizeof(ENTRY*) * E[h].nbItem);
-    free(E[h].items);
-    E[h].items = nitems;
-}
-
 int HashTable::Add(uint64_t h, int256_t *x, int256_t *d) {
-    ENTRY *e = CreateEntry(x,d);
+    ENTRY e = CreateEntry(x,d);
     return Add(h,e);
 }
 
@@ -201,61 +198,31 @@ void HashTable::CalcDistAndType(int256_t d, Int* kDist, uint32_t* kType) {
     kDist->bits64[3] = d.i64[3];
     if(sign) kDist->ModNegK1order();
 }
-int HashTable::Add(uint64_t h, ENTRY* e) {
-    if (E[h].items == NULL) {
-        // Initialize a linked list for chaining
-        E[h].items = (ENTRY **)malloc(sizeof(ENTRY *));
-        E[h].maxItem = 1;
-    }
+int HashTable::Add(uint64_t h, const ENTRY& e) {
+    auto& bucket = E[h].items;
+    auto it = std::lower_bound(bucket.begin(), bucket.end(), e, [](const ENTRY& lhs, const ENTRY& rhs) {
+        return compare(&lhs.x, &rhs.x) < 0;
+    });
 
-    // Use binary search to find insertion point
-    int left = 0;
-    int right = E[h].nbItem - 1;
-    int mid;
-    int comp;
-    
-    while (left <= right) {
-        mid = left + (right - left) / 2;
-        comp = compare(&e->x, &GET(h, mid)->x);
-        
-        if (comp == 0) {
-            // Found a matching entry
-            if((e->d.i64[0] == GET(h,mid)->d.i64[0]) && (e->d.i64[1] == GET(h,mid)->d.i64[1]) && 
-               (e->d.i64[2] == GET(h,mid)->d.i64[2]) && (e->d.i64[3] == GET(h,mid)->d.i64[3])) {
-                return ADD_DUPLICATE;
-            } else {
-                CalcDistAndType(GET(h, mid)->d, &kDist, &kType);
-                return ADD_COLLISION;
-            }
-        } else if (comp < 0) {
-            right = mid - 1;
-        } else {
-            left = mid + 1;
+    if (it != bucket.end() && compare(&e.x, &it->x) == 0) {
+        if((e.d.i64[0] == it->d.i64[0]) && (e.d.i64[1] == it->d.i64[1]) &&
+           (e.d.i64[2] == it->d.i64[2]) && (e.d.i64[3] == it->d.i64[3])) {
+            return ADD_DUPLICATE;
         }
+
+        CalcDistAndType(it->d, &kDist, &kType);
+        return ADD_COLLISION;
     }
 
-    // Insertion point is at 'left'
-    if (E[h].nbItem >= E[h].maxItem) {
-        // Resize the linked list if necessary
-        E[h].maxItem *= 2;
-        E[h].items = (ENTRY **)realloc(E[h].items, sizeof(ENTRY *) * E[h].maxItem);
-    }
-
-    // Shift elements to make room for the new entry
-    for (int i = E[h].nbItem; i > left; i--) {
-        E[h].items[i] = E[h].items[i - 1];
-    }
-    
-    // Insert the new entry at the correct position
-    E[h].items[left] = e;
-    E[h].nbItem++;
+    bucket.insert(it, e);
+    E[h].nbItem = (uint32_t)bucket.size();
     
     return ADD_OK;
 }
 
-int HashTable::compare(int256_t *i1, int256_t *i2) {
-    uint64_t *a = i1->i64;
-    uint64_t *b = i2->i64;
+int HashTable::compare(const int256_t *i1, const int256_t *i2) {
+    const uint64_t *a = i1->i64;
+    const uint64_t *b = i2->i64;
     if(a[1] == b[1]) {
         if(a[0] == b[0]) {
             return 0;
@@ -268,15 +235,13 @@ int HashTable::compare(int256_t *i1, int256_t *i2) {
 }
 
 std::string HashTable::GetSizeInfo() {
-    char *unit;
     uint64_t totalByte = sizeof(E);
     uint64_t usedByte = HASH_SIZE*2*sizeof(uint32_t);
     for (int h = 0; h < HASH_SIZE; h++) {
-        totalByte += sizeof(ENTRY *) * E[h].maxItem;
-        totalByte += sizeof(ENTRY) * E[h].nbItem;
+        totalByte += sizeof(ENTRY) * E[h].items.capacity();
         usedByte += sizeof(ENTRY) * E[h].nbItem;
     }
-    unit = "MB";
+    const char *unit = "MB";
     double totalMB = (double)totalByte / (1024.0*1024.0);
     double usedMB = (double)usedByte / (1024.0*1024.0);
     if(totalMB > 1024) {
@@ -289,19 +254,18 @@ std::string HashTable::GetSizeInfo() {
         usedMB /= 1024;
         unit = "TB";
     }
-    char ret[256];
-    sprintf(ret,"%.1f/%.1f%s",usedMB,totalMB,unit);
-    return std::string(ret);
+    std::ostringstream out;
+    out << std::fixed << std::setprecision(1) << usedMB << "/" << totalMB << unit;
+    return out.str();
 }
 
 std::string HashTable::GetStr(int256_t *i) {
-    std::string ret;
-    char tmp[256];
+    std::ostringstream out;
+    out << std::uppercase << std::hex << std::setfill('0');
     for(int n = 3; n >= 0; n--) {
-        ::sprintf(tmp,"%08X",i->i32[n]); 
-        ret += std::string(tmp);
+        out << std::setw(8) << i->i32[n];
     }
-    return ret;
+    return out.str();
 }
 
 void HashTable::SaveTable(FILE* f) {
@@ -312,11 +276,11 @@ void HashTable::SaveTable(FILE* f, uint32_t from, uint32_t to, bool printPoint) 
     uint64_t point = GetNbItem() / 16;
     uint64_t pointPrint = 0;
     for(uint32_t h = from; h < to; h++) {
-        fwrite(&E[h].nbItem,sizeof(uint32_t),1,f);
-        fwrite(&E[h].maxItem,sizeof(uint32_t),1,f);
-        for(uint32_t i = 0; i < E[h].nbItem; i++) {
-            fwrite(&(E[h].items[i]->x),16,1,f);
-            fwrite(&(E[h].items[i]->d),16,1,f);
+        uint32_t nbItem = E[h].nbItem;
+        uint32_t maxItem = (uint32_t)E[h].items.capacity();
+        WriteBucketHeader(f, nbItem, maxItem);
+        for(uint32_t i = 0; i < nbItem; i++) {
+            WriteEntry(f, E[h].items[i]);
             if(printPoint) {
                 pointPrint++;
                 if(pointPrint > point) {
@@ -339,9 +303,11 @@ void HashTable::SeekNbItem(FILE* f, bool restorePos) {
 
 void HashTable::SeekNbItem(FILE* f, uint32_t from, uint32_t to) {
     for(uint32_t h = from; h < to; h++) {
-        fread(&E[h].nbItem,sizeof(uint32_t),1,f);
-        fread(&E[h].maxItem,sizeof(uint32_t),1,f);
-        uint64_t hSize = 32ULL * E[h].nbItem;
+        uint32_t nbItem;
+        uint32_t maxItem;
+        ReadBucketHeader(f, nbItem, maxItem);
+        E[h].nbItem = nbItem;
+        uint64_t hSize = 32ULL * nbItem;
         fseeko(f,hSize,SEEK_CUR);
     }
 }
@@ -349,15 +315,15 @@ void HashTable::SeekNbItem(FILE* f, uint32_t from, uint32_t to) {
 void HashTable::LoadTable(FILE* f, uint32_t from, uint32_t to) {
     Reset();
     for(uint32_t h = from; h < to; h++) {
-        fread(&E[h].nbItem,sizeof(uint32_t),1,f);
-        fread(&E[h].maxItem,sizeof(uint32_t),1,f);
-        if(E[h].maxItem > 0)
-            E[h].items = (ENTRY**)malloc(sizeof(ENTRY*) * E[h].maxItem);
-        for(uint32_t i = 0; i < E[h].nbItem; i++) {
-            ENTRY* e = (ENTRY*)malloc(sizeof(ENTRY));
-            fread(&(e->x),16,1,f);
-            fread(&(e->d),16,1,f);
-            E[h].items[i] = e;
+        uint32_t nbItem;
+        uint32_t maxItem;
+        ReadBucketHeader(f, nbItem, maxItem);
+        E[h].nbItem = nbItem;
+        E[h].items.clear();
+        E[h].items.reserve(maxItem);
+        E[h].items.resize(nbItem);
+        for(uint32_t i = 0; i < nbItem; i++) {
+            ReadEntry(f, E[h].items[i]);
         }
     }
 }
@@ -374,15 +340,16 @@ void HashTable::PrintInfo() {
     double std = 0;
     double avg = (double)GetNbItem() / (double)HASH_SIZE;
     for(uint32_t h = 0; h < HASH_SIZE; h++) {
-        if(E[h].nbItem > max) {
-            max = E[h].nbItem;
+        uint32_t nbItem = E[h].nbItem;
+        if(nbItem > max) {
+            max = nbItem;
             maxH = h;
         }
-        if(E[h].nbItem < min) {
-            min = E[h].nbItem;
+        if(nbItem < min) {
+            min = nbItem;
             minH = h;
         }
-        std += (avg - (double)E[h].nbItem)*(avg - (double)E[h].nbItem);
+        std += (avg - (double)nbItem)*(avg - (double)nbItem);
     }
     std /= (double)HASH_SIZE;
     std = sqrt(std);
