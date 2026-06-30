@@ -11,8 +11,9 @@ OBJET = $(addprefix $(OBJDIR)/,$(SRC:.cpp=.o))
 
 CXX        = g++
 CUDA       = /usr/local/cuda
-CXXCUDA    = g++
+CXXCUDA    = $(shell command -v g++-12 2>/dev/null || command -v g++-13 2>/dev/null || command -v g++-14 2>/dev/null || echo g++)
 NVCC       = nvcc
+NVCCFLAGS  = -std=c++17 -maxrregcount=0 --ptxas-options=-v --compile --compiler-options -fPIC -ccbin $(CXXCUDA) -allow-unsupported-compiler -m64 -O3 -Icompat -I. -Icore -Imemory -Istorage -Imath -Imath/cpu -Imath/gpu -I$(CUDA)/include
 ifdef gpu
 
 
@@ -30,7 +31,7 @@ endif
 ifdef gpu
 $(OBJDIR)/math/gpu/engine.o: math/gpu/engine.cu
 	@mkdir -p $(dir $@)
-	$(NVCC) -maxrregcount=0 --ptxas-options=-v --compile --compiler-options -fPIC -ccbin $(CXXCUDA) -m64 -O3 -I. -Icore -Imemory -Istorage -Imath -Imath/cpu -Imath/gpu -I$(CUDA)/include -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/math/gpu/engine.o -c math/gpu/engine.cu
+	$(NVCC) $(NVCCFLAGS) -gencode=arch=compute_$(ccap),code=sm_$(ccap) -o $(OBJDIR)/math/gpu/engine.o -c math/gpu/engine.cu
 endif
 $(OBJDIR)/%.o : %.cpp
 	@mkdir -p $(dir $@)
