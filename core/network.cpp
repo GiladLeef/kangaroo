@@ -2,28 +2,23 @@
 #include <fstream>
 #include "intgroup.h"
 #include "timer.h"
+#include "workfile.h"
 #include <string.h>
 #include <math.h>
 #include <algorithm>
 #include <signal.h>
-#include <pthread.h>
 #include <unordered_map>
 #include <memory>
 #include <array>
 #include <utility>
 #include <vector>
 #include <filesystem>
+#include <mutex>
 
 using namespace std;
 namespace fs = std::filesystem;
 
 static SOCKET serverSock = 0;
-
-struct MutexLock {
-    pthread_mutex_t *m;
-    MutexLock(pthread_mutex_t *mutex) : m(mutex) { pthread_mutex_lock(m); }
-    ~MutexLock() { pthread_mutex_unlock(m); }
-};
 
 // Common part
 #define MAX_CLIENT 256
@@ -279,8 +274,8 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
 
       fileName.resize(strSize);
       GET("fileName",p->clientSock,fileName.data(),strSize,ntimeout);
-      FILE* f = fopen(fileName.c_str(),"rb");
-      if(f == NULL) {
+      workfile::FileHandle f = workfile::openFile(fileName, "rb");
+      if(!f) {
         // No backup
         ::printf("LoadKang: Cannot open %s for reading\n",fileName.c_str());
         ::printf("%s\n",::strerror(errno));
@@ -288,28 +283,26 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
         break;
       }
 
-      if(::fread(&header,sizeof(uint32_t),1,f) != 1) {
+      if(!workfile::readValue(f, header)) {
         ::printf("LoadKang: Cannot read from %s\n",fileName.c_str());
         ::printf("%s\n",::strerror(errno));
-        ::fclose(f);
         CLIENT_ABORT();
       }
 
       if(header!=HEADKS) {
         ::printf("LoadKang: %s Not a compressed kangaroo file\n",fileName.c_str());
         ::printf("%s\n",::strerror(errno));
-        ::fclose(f);
         CLIENT_ABORT();
       }
 
-      ::fread(&version,sizeof(uint32_t),1,f);
-      ::fread(&nbKangaroo,sizeof(uint64_t),1,f);
+      workfile::readValue(f, version);
+      workfile::readValue(f, nbKangaroo);
 
       PUT("nbKangaroo",p->clientSock,&nbKangaroo,sizeof(uint64_t),ntimeout);
 
       auto readBlock = [&](uint32_t nbK,std::vector<int256_t>& buffer) {
         for(uint32_t k = 0; k < nbK; k++) {
-          if(::fread(&buffer[k],16,1,f) != 1) {
+          if(::fread(&buffer[k],16,1,f.get()) != 1) {
             return false;
           }
         }
@@ -319,12 +312,10 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
         return Write(p->clientSock,(char*)buffer.data(),(int)(nbK * 16),ntimeout) == (int)(nbK * 16);
       };
       if(!TransferKangarooBlocks(nbKangaroo,KBuff,checkSum,readBlock,writeBlock)) {
-        ::fclose(f);
         CLIENT_ABORT();
       }
 
       PUT("checkSum",p->clientSock,checkSum.bits64,32,ntimeout);
-      ::fclose(f);
     } break;
 
     case SERVER_SAVEKANG: {
@@ -349,39 +340,35 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
 
       std::string fileNameTmp = fileName + ".tmp";
 
-      FILE* f = fopen(fileNameTmp.c_str(),"wb");
-      if(f == NULL) {
+      workfile::FileHandle f = workfile::openFile(fileNameTmp, "wb");
+      if(!f) {
         ::printf("\nCannot open %s for writing\n",fileNameTmp.c_str());
         ::printf("%s\n",::strerror(errno));
         CLIENT_ABORT();
       }
 
-      if(::fwrite(&header,sizeof(uint32_t),1,f) != 1) {
+      if(!workfile::writeValue(f, header)) {
         ::printf("\nCannot write to %s\n",fileNameTmp.c_str());
         ::printf("%s\n",::strerror(errno));
-        ::fclose(f);
         CLIENT_ABORT();
       }
-      ::fwrite(&version,sizeof(uint32_t),1,f);
-      ::fwrite(&nbKangaroo,sizeof(uint64_t),1,f);
+      workfile::writeValue(f, version);
+      workfile::writeValue(f, nbKangaroo);
       
       auto readBlock = [&](uint32_t nbK,std::vector<int256_t>& buffer) {
         return Read(p->clientSock,(char*)buffer.data(),(int)(nbK * 16),ntimeout) == (int)(nbK * 16);
       };
       auto writeBlock = [&](uint32_t nbK,std::vector<int256_t>& buffer) {
         for(uint32_t k = 0; k < nbK; k++) {
-          if(::fwrite(&buffer[k],16,1,f) != 1) {
+          if(::fwrite(&buffer[k],16,1,f.get()) != 1) {
             return false;
           }
         }
         return true;
       };
       if(!TransferKangarooBlocks(nbKangaroo,KBuff,checkSum,readBlock,writeBlock)) {
-        ::fclose(f);
         CLIENT_ABORT();
       }
-
-      ::fclose(f);
 
       K.SetInt32(0);
       GET("checksum",p->clientSock,K.bits64,32,ntimeout);
@@ -424,11 +411,10 @@ bool Kangaroo::HandleRequest(TH_PARAM *p) {
                   p->clientInfo.c_str(), head.nbDP, nbRead, (int)(sizeof(DP) * head.nbDP));
               CLIENT_ABORT();
           } else {
-              LOCK(ghMutex);
+              std::lock_guard<std::mutex> lock(ghMutex);
               DP_CACHE dc;
               dc.dp = std::move(dp);
               recvDP.push_back(dc);
-              UNLOCK(ghMutex);
           }
       }
     } break;
@@ -475,7 +461,7 @@ void Kangaroo::AcceptConnections(SOCKET server_soc) {
       p->obj = this;
       p->isRunning = true;
       p->clientSock = clientSock;
-      LaunchThread(_acceptThread,p.get());
+      LaunchThread(_acceptThread,p.get()).detach();
       p.release();
     }
   }
@@ -507,7 +493,7 @@ void Kangaroo::RunServer() {
   }
 
   // Main thread of server (handle backup and collision check)
-  LaunchThread(_processServer,(TH_PARAM *)this);
+  LaunchThread(_processServer,(TH_PARAM *)this).detach();
   Timer::SleepMillis(100);
 
   // Server stuff
@@ -793,7 +779,7 @@ bool Kangaroo::GetKangaroosFromServer(std::string& fileName,std::vector<int256_t
 
 // Send Kangaroo to Server
 bool Kangaroo::SendKangaroosToServer(std::string& fileName,std::vector<int256_t>& kangs) {
-  MutexLock l(&ghMutex);
+  std::lock_guard<std::mutex> l(ghMutex);
   int nbWrite;
   uint32_t fileNameSize = (uint32_t)fileName.length();
   uint64_t nbKangaroo = kangs.size();
@@ -842,7 +828,7 @@ bool Kangaroo::SendToServer(std::vector<ITEM> &dps,uint32_t threadId,uint32_t gp
     return false;
 
   {
-    MutexLock l(&ghMutex);
+    std::lock_guard<std::mutex> l(ghMutex);
     WaitForServer();
   }
   
@@ -875,7 +861,7 @@ bool Kangaroo::SendToServer(std::vector<ITEM> &dps,uint32_t threadId,uint32_t gp
     head.threadId = threadId;
 
     {
-      MutexLock l(&ghMutex);
+      std::lock_guard<std::mutex> l(ghMutex);
       PUT("CMD",serverConn,&cmd,1,ntimeout);
       PUT("DPHeader",serverConn,&head,sizeof(DPHEADER),ntimeout);
       PUT("DP",serverConn,dp.data(),sizeof(DP)*nbDP,ntimeout);

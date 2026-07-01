@@ -74,26 +74,23 @@ void Kangaroo::CreateEmptyPartWork(std::string& partName) {
         fs::create_directory(partName);
 
         string hName = partName + "/header";
-        FILE* f = fopen(hName.c_str(), "wb");
-        if (f == NULL) {
+        FileHandle f = openFile(hName, "wb");
+        if (!f) {
             ::printf("CreateEmptyPartWork: Cannot open %s for writing\n", hName.c_str());
             ::printf("%s\n", ::strerror(errno));
             return;
         }
-        fclose(f);
 
         for (int i = 0; i < MERGE_PART; i++) {
-            FILE* f = OpenPart(partName, "wb", i);
-            if (f == NULL)
+            FileHandle f(OpenPart(partName, "wb", i));
+            if (!f)
                 return;
 
             for (int j = 0; j < H_PER_PART; j++) {
                 uint32_t z = 0;
-                fwrite(&z, sizeof(uint32_t), 1, f);
-                fwrite(&z, sizeof(uint32_t), 1, f);
+                writeValue(f, z);
+                writeValue(f, z);
             }
-
-            fclose(f);
         }
 
         ::printf("CreateEmptyPartWork %s done\n", partName.c_str());
@@ -111,12 +108,12 @@ bool Kangaroo::MergePartition(TH_PARAM* p) {
   const string& p1Name = p->part1Name;
   const string& p2Name = p->part2Name;
 
-  FILE *f1 = OpenPart(p1Name,"rb",part,false);
-  if(f1 == NULL) return false;
-  FILE* f2 = OpenPart(p2Name,"rb",part,false);
-  if(f2 == NULL) return false;
-  FILE* f = OpenPart(p1Name,"wb",part,true);
-  if(f == NULL) return false;
+  FileHandle f1(OpenPart(p1Name,"rb",part,false));
+  if(!f1) return false;
+  FileHandle f2(OpenPart(p2Name,"rb",part,false));
+  if(!f2) return false;
+  FileHandle f(OpenPart(p1Name,"wb",part,true));
+  if(!f) return false;
 
   uint32_t hStart = part * (HASH_SIZE / MERGE_PART);
   uint32_t hStop = (part +1) * (HASH_SIZE / MERGE_PART);
@@ -130,7 +127,7 @@ bool Kangaroo::MergePartition(TH_PARAM* p) {
 
   for(uint32_t h = hStart; h < hStop && !endOfSearch; h++) {
 
-    int mStatus = HashTable::MergeH(h,f1,f2,f,&hDP,&hDuplicate,&d1,&type1,&d2,&type2);
+    int mStatus = HashTable::MergeH(h,f1.get(),f2.get(),f.get(),&hDP,&hDuplicate,&d1,&type1,&d2,&type2);
     switch(mStatus) {
     case ADD_OK:
       break;
@@ -143,10 +140,6 @@ bool Kangaroo::MergePartition(TH_PARAM* p) {
     collisionInSameHerd += hDuplicate;
 
   }
-
-  ::fclose(f1);
-  ::fclose(f2);
-  ::fclose(f);
 
   string oldName = GetPartName(p1Name,part,true);
   string newName = GetPartName(p1Name,part,false);
@@ -191,10 +184,9 @@ bool Kangaroo::MergeWorkPartPart(std::string& part1Name,std::string& part2Name) 
   double time1 = 0;
 
   if(!partIsEmpty) {
-    FILE* f1 = NULL;
+    FileHandle f1;
     if(!LoadWorkPayload(file1,"MergeWorkPartPart",&v1,&f1,payload1))
       return true;
-    ::fclose(f1);
     count1 = payload1.totalCount;
     time1 = payload1.totalTime;
   }
@@ -203,7 +195,7 @@ bool Kangaroo::MergeWorkPartPart(std::string& part1Name,std::string& part2Name) 
   uint64_t count2 = 0;
   double time2 = 0;
 
-  FILE* f2 = NULL;
+  FileHandle f2;
   if(!LoadWorkPayload(file2,"MergeWorkPartPart",&v2,&f2,payload2)) {
     return true;
   }
@@ -213,7 +205,6 @@ bool Kangaroo::MergeWorkPartPart(std::string& part1Name,std::string& part2Name) 
   if(!partIsEmpty) {
 
     if(!SameWorkParameters("MergeWorkPartPart",v1,v2,payload1.rangeStart,payload1.rangeEnd,payload2.rangeStart,payload2.rangeEnd,payload1.key,payload2.key)) {
-      ::fclose(f2);
       return true;
     }
 
@@ -222,31 +213,24 @@ bool Kangaroo::MergeWorkPartPart(std::string& part1Name,std::string& part2Name) 
     payload1 = payload2;
 
   }
-  fclose(f2);
-
   ::printf("%s: [DP%d]\n",part1Name.c_str(),payload1.dpSize);
   ::printf("%s: [DP%d]\n",part2Name.c_str(),payload2.dpSize);
 
   endOfSearch = false;
   if(!SetSearchContext(payload1.rangeStart,payload1.rangeEnd,payload1.key,"MergeWorkPartPart")) {
-    ::fclose(f2);
     return true;
   }
 
-  FILE* f = fopen(file1.c_str(),"wb");
-  if(f == NULL) {
+  FileHandle f = openFile(file1, "wb");
+  if(!f) {
     ::printf("MergeWorkPart: Cannot open %s for writing\n",file1.c_str());
     ::printf("%s\n",::strerror(errno));
-    fclose(f2);
     return true;
   }
   dpSize = (payload1.dpSize < payload2.dpSize) ? payload1.dpSize : payload2.dpSize;
-  if(!SaveHeader(file1,f,HEADW,count1 + count2,time1 + time2)) {
-    ::fclose(f);
-    fclose(f2);
+  if(!SaveHeader(file1,f.get(),HEADW,count1 + count2,time1 + time2)) {
     return true;
   }
-  fclose(f);
 
 
   int nbCore = Timer::getCoreNumber();
@@ -309,7 +293,7 @@ bool Kangaroo::FillEmptyPartFromFile(std::string& partName,std::string& fileName
 
   t0 = Timer::getTick();
 
-  FILE* f1 = NULL;
+  FileHandle f1;
   if(!LoadWorkPayload(fileName,"FillEmptyPartFromFile",&v1,&f1,payload1))
     return true;
 
@@ -324,19 +308,15 @@ bool Kangaroo::FillEmptyPartFromFile(std::string& partName,std::string& fileName
   InitSearchKey();
 
   string file1 = partName + "/header";
-  FILE* f = fopen(file1.c_str(),"wb");
-  if(f == NULL) {
+  FileHandle f = openFile(file1, "wb");
+  if(!f) {
     ::printf("FillEmptyPartFromFile: Cannot open %s for writing\n",file1.c_str());
     ::printf("%s\n",::strerror(errno));
-    ::fclose(f1);
     return true;
   }
-  if(!SaveHeader(file1,f,HEADW,payload1.totalCount,payload1.totalTime)) {
-    ::fclose(f);
-    ::fclose(f1);
+  if(!SaveHeader(file1,f.get(),HEADW,payload1.totalCount,payload1.totalTime)) {
     return true;
   }
-  ::fclose(f);
 
   ::printf("Part %s: [DP%d]\n",partName.c_str(),payload1.dpSize);
   ::printf("File %s: [DP%d]\n",fileName.c_str(),payload1.dpSize);
@@ -348,7 +328,7 @@ bool Kangaroo::FillEmptyPartFromFile(std::string& partName,std::string& fileName
 
     if(p % (MERGE_PART / 64) == 0) ::printf(".");
 
-    FILE *f = OpenPart(partName,"wb",p,false);
+    FileHandle f(OpenPart(partName,"wb",p,false));
     uint32_t hStart = p * (HASH_SIZE / MERGE_PART);
     uint32_t hStop = (p + 1) * (HASH_SIZE / MERGE_PART);
 
@@ -357,20 +337,18 @@ bool Kangaroo::FillEmptyPartFromFile(std::string& partName,std::string& fileName
     unsigned char buff[32];
 
     for(uint32_t h= hStart;h<hStop;h++) {
-      ::fread(&nbItem,sizeof(uint32_t),1,f1);
-      ::fread(&maxItem,sizeof(uint32_t),1,f1);
-      ::fwrite(&nbItem,sizeof(uint32_t),1,f);
-      ::fwrite(&maxItem,sizeof(uint32_t),1,f);
+      readValue(f1, nbItem);
+      readValue(f1, maxItem);
+      writeValue(f, nbItem);
+      writeValue(f, maxItem);
       for(uint32_t i=0;i<nbItem;i++) {
-        ::fread(&buff,32,1,f1);
-        ::fwrite(&buff,32,1,f);
+        ::fread(&buff,32,1,f1.get());
+        ::fwrite(&buff,32,1,f.get());
       }
       nbDP += nbItem;
     }
-    ::fclose(f);
   }
 
-  ::fclose(f1);
   t1 = Timer::getTick();
   ::printf("Done [2^%.3f DP][%s]\n",log2((double)nbDP),GetTimeStr(t1 - t0).c_str());
   
@@ -393,19 +371,17 @@ bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool print
 
   WorkFilePayload payload1;
 
-  FILE* f1 = NULL;
+  FileHandle f1;
   if(!LoadWorkPayload(file1,"MergeWorkPart",&v1,&f1,payload1))
     return true;
-  ::fclose(f1);
 
   WorkFilePayload payload2;
-  FILE* f2 = NULL;
+  FileHandle f2;
   if(!LoadWorkPayload(file2,"MergeWorkPart",&v2,&f2,payload2)) {
     return true;
   }
 
   if(!SameWorkParameters("MergeWorkPart",v1,v2,payload1.rangeStart,payload1.rangeEnd,payload2.rangeStart,payload2.rangeEnd,payload1.key,payload2.key)) {
-    ::fclose(f2);
     return true;
   }
 
@@ -415,7 +391,6 @@ bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool print
   endOfSearch = false;
 
   if(!SetSearchContext(payload1.rangeStart,payload1.rangeEnd,payload1.key,"MergeWorkPart")) {
-    ::fclose(f2);
     return true;
   }
 
@@ -423,20 +398,16 @@ bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool print
 
   ::printf("Merging");
 
-  FILE* f = fopen(file1.c_str(),"wb");
-  if(f == NULL) {
+  FileHandle f = openFile(file1, "wb");
+  if(!f) {
     ::printf("MergeWorkPart: Cannot open %s for writing\n",file1.c_str());
     ::printf("%s\n",::strerror(errno));
-    fclose(f2);
     return true;
   }
   dpSize = (payload1.dpSize < payload2.dpSize) ? payload1.dpSize : payload2.dpSize;
-  if(!SaveHeader(file1,f,HEADW,payload1.totalCount + payload2.totalCount,payload1.totalTime + payload2.totalTime)) {
-    ::fclose(f);
-    fclose(f2);
+  if(!SaveHeader(file1,f.get(),HEADW,payload1.totalCount + payload2.totalCount,payload1.totalTime + payload2.totalTime)) {
     return true;
   }
-  fclose(f);
 
   uint64_t nbDP = 0;
   uint32_t hDP;
@@ -453,12 +424,12 @@ bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool print
     uint32_t hStart = part * (HASH_SIZE / MERGE_PART);
     uint32_t hStop = (part + 1) * (HASH_SIZE / MERGE_PART);
 
-    FILE *f1p = OpenPart(partName,"rb",part);
-    FILE *fp = OpenPart(partName,"wb",part,true);
+    FileHandle f1p(OpenPart(partName,"rb",part));
+    FileHandle fp(OpenPart(partName,"wb",part,true));
 
     for(uint32_t h = hStart; h < hStop && !endOfSearch; h++) {
 
-      int mStatus = HashTable::MergeH(h,f1p,f2,fp,&hDP,&hDuplicate,&d1,&type1,&d2,&type2);
+      int mStatus = HashTable::MergeH(h,f1p.get(),f2.get(),fp.get(),&hDP,&hDuplicate,&d1,&type1,&d2,&type2);
       switch(mStatus) {
       case ADD_OK:
         break;
@@ -472,9 +443,6 @@ bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool print
 
     }
 
-    fclose(f1p);
-    fclose(fp);
-
     string oldName = GetPartName(partName,part,true);
     string newName = GetPartName(partName,part,false);
     if(!endOfSearch) {
@@ -485,7 +453,6 @@ bool Kangaroo::MergeWorkPart(std::string& partName,std::string& file2,bool print
     }
   }
 
-  fclose(f2);
   t1 = Timer::getTick();
 
   if(!endOfSearch) {
@@ -525,20 +492,17 @@ bool Kangaroo::MergeWork(std::string& file1,std::string& file2,std::string& dest
   uint32_t v2;
 
   WorkFilePayload payload1;
-  FILE* f1 = NULL;
+  FileHandle f1;
   if(!LoadWorkPayload(file1,"MergeWork",&v1,&f1,payload1))
     return true;
 
   WorkFilePayload payload2;
-  FILE* f2 = NULL;
+  FileHandle f2;
   if(!LoadWorkPayload(file2,"MergeWork",&v2,&f2,payload2)) {
-    ::fclose(f1);
     return true;
   }
 
   if(!SameWorkParameters("MergeWork",v1,v2,payload1.rangeStart,payload1.rangeEnd,payload2.rangeStart,payload2.rangeEnd,payload1.key,payload2.key)) {
-    ::fclose(f1);
-    ::fclose(f2);
     return true;
   }
 
@@ -547,25 +511,18 @@ bool Kangaroo::MergeWork(std::string& file1,std::string& file2,std::string& dest
 
   endOfSearch = false;
   if(!SetSearchContext(payload1.rangeStart,payload1.rangeEnd,payload1.key,"MergeWork")) {
-    ::fclose(f1);
-    ::fclose(f2);
     return true;
   }
 
-  FILE* f = fopen(dest.c_str(),"wb");
-  if(f == NULL) {
+  FileHandle f = openFile(dest, "wb");
+  if(!f) {
     ::printf("MergeWork: Cannot open %s for writing\n",dest.c_str());
     ::printf("%s\n",::strerror(errno));
-    ::fclose(f1);
-    ::fclose(f2);
     return true;
   }
 
   dpSize = (payload1.dpSize < payload2.dpSize) ? payload1.dpSize : payload2.dpSize;
-  if(!SaveHeader(dest,f,HEADW,payload1.totalCount + payload2.totalCount,payload1.totalTime + payload2.totalTime)) {
-    ::fclose(f);
-    ::fclose(f1);
-    ::fclose(f2);
+  if(!SaveHeader(dest,f.get(),HEADW,payload1.totalCount + payload2.totalCount,payload1.totalTime + payload2.totalTime)) {
     return true;
   }
 
@@ -587,7 +544,7 @@ bool Kangaroo::MergeWork(std::string& file1,std::string& file2,std::string& dest
       ::printf(".");
     }
 
-    int mStatus = HashTable::MergeH(h,f1,f2,f,&hDP,&hDuplicate,&d1,&type1,&d2,&type2);
+    int mStatus = HashTable::MergeH(h,f1.get(),f2.get(),f.get(),&hDP,&hDuplicate,&d1,&type1,&d2,&type2);
     switch(mStatus) {
     case ADD_OK:
       break;
@@ -602,14 +559,10 @@ bool Kangaroo::MergeWork(std::string& file1,std::string& file2,std::string& dest
 
   uint64_t nbWalk1 = 0;
   uint64_t nbWalk2 = 0;
-  readExact(f1,&nbWalk1,sizeof(uint64_t));
-  readExact(f2,&nbWalk2,sizeof(uint64_t));
+  readValue(f1, nbWalk1);
+  readValue(f2, nbWalk2);
   uint64_t totalWalk = nbWalk1 + nbWalk2;
-  ::fwrite(&totalWalk,sizeof(uint64_t),1,f);
-
-  ::fclose(f1);
-  ::fclose(f2);
-  ::fclose(f);
+  writeValue(f, totalWalk);
 
   t1 = Timer::getTick();
 
@@ -639,13 +592,12 @@ void Kangaroo::MergeDir(std::string& dirName,std::string& dest) {
   for(const auto& entry : fs::directory_iterator(dirName)) {
     if(fs::is_regular_file(entry.path())) {
       uint32_t version = 0;
-      FILE* f = ReadHeader(entry.path().string(),&version,HEADW);
+      FileHandle f(ReadHeader(entry.path().string(),&version,HEADW));
       if(f) {
         File e{entry.path().string(),0};
-        fseeko(f,0,SEEK_END);
-        e.size = (uint64_t)ftello(f);
+        fseeko(f.get(),0,SEEK_END);
+        e.size = (uint64_t)ftello(f.get());
         listFiles.push_back(e);
-        fclose(f);
       }
     }
   }

@@ -1,10 +1,11 @@
 #ifndef KANGAROOH
 #define KANGAROOH
 
-#include <pthread.h>
 #include <array>
 #include <string>
 #include <vector>
+#include <thread>
+#include <mutex>
 #include <signal.h> 
 #include "constants.h"
 #include "engine.h"
@@ -25,15 +26,13 @@ typedef int SOCKET;
 #include "secp256k1.h"
 #include "hashtable.h"
 #include "intgroup.h"
+#include "workfile.h"
 
 namespace workfile {
 struct WorkFilePayload;
 }
 
-typedef pthread_t THREAD_HANDLE;
-#define LOCK(mutex)  pthread_mutex_lock(&(mutex));
-#define UNLOCK(mutex) pthread_mutex_unlock(&(mutex));
-
+using THREAD_HANDLE = std::thread;
 class Kangaroo;
 
 // Input thread parameters
@@ -147,7 +146,7 @@ private:
   bool SetSearchContext(const Int& start,const Int& end,const Point& key,const char* label);
   std::string GetTimeStr(double s);
   bool Output(Int* pk,char sInfo,int sType);
-  bool LoadWorkPayload(const std::string& fileName,const char* label,uint32_t* version,FILE** fOut,workfile::WorkFilePayload& payload);
+  bool LoadWorkPayload(const std::string& fileName,const char* label,uint32_t* version,workfile::FileHandle* fOut,workfile::WorkFilePayload& payload);
 
   // Backup stuff
   void SaveWork(std::string fileName,FILE *f,int type,uint64_t totalCount,double totalTime);
@@ -156,7 +155,7 @@ private:
   void FetchWalks(uint64_t nbWalk,Int *x,Int *y,Int *d);
   void FetchWalks(uint64_t nbWalk,std::vector<int256_t>& kangs,Int* x,Int* y,Int* d);
   void FectchKangaroos(TH_PARAM *threads);
-  FILE *ReadHeader(std::string fileName,uint32_t *version,int type);
+  workfile::FileHandle ReadHeader(std::string fileName,uint32_t *version,int type);
   bool  SaveHeader(std::string fileName,FILE* f,int type,uint64_t totalCount,double totalTime);
   int FSeek(FILE *stream,uint64_t pos);
   uint64_t FTell(FILE *stream);
@@ -178,8 +177,8 @@ private:
   bool SendKangaroosToServer(std::string& fileName,std::vector<int256_t>& kangs);
   bool GetKangaroosFromServer(std::string& fileName,std::vector<int256_t>& kangs);
 
-  pthread_mutex_t  ghMutex;
-  pthread_mutex_t  saveMutex;
+  std::mutex  ghMutex;
+  std::mutex  saveMutex;
   THREAD_HANDLE LaunchThread(void *(*func) (void *), TH_PARAM *p);
 
   void JoinThreads(THREAD_HANDLE *handles, int nbThread);
@@ -231,7 +230,7 @@ private:
 
   // Backup stuff
   std::string outputFile;
-  FILE *fRead;
+  workfile::FileHandle fRead;
   uint64_t offsetCount;
   double offsetTime;
   int64_t nbLoadedWalk;

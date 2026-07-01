@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 #include <iostream>
-#include <memory>
 #include <thread>
 #include <atomic>
 #include <cmath>
@@ -14,18 +13,41 @@
 using namespace std;
 using namespace workfile;
 
+namespace {
+
+template <typename PreBatchFn, typename SetupFn, typename PostBatchFn>
+void RunCheckBatches(int totalItems,int step,int nbThread,std::vector<TH_PARAM>& params,std::vector<THREAD_HANDLE>& thHandles,void* (*worker)(void*),PreBatchFn&& preBatch,SetupFn&& setup,PostBatchFn&& postBatch) {
+    for (int base = 0; base < totalItems; base += step) {
+        preBatch(base);
+        ::printf(".");
+        for (int i = 0; i < nbThread; i++) {
+            setup(base, i, params[i]);
+            thHandles[i] = THREAD_HANDLE(worker, &params[i]);
+        }
+        for (auto& th : thHandles) {
+            if (th.joinable()) {
+                th.join();
+            }
+        }
+        postBatch(base);
+    }
+}
+
+}  // namespace
+
 uint32_t Kangaroo::CheckHash(uint32_t h, uint32_t nbItem, HashTable* hT, FILE* f) {
-    bool ok = true;
     vector<Int> dists;
     vector<uint32_t> types;
     Point Z;
     Z.Clear();
     uint32_t nbWrong = 0;
 
-    unique_ptr<ENTRY[]> items;
+    vector<ENTRY> items;
+    dists.reserve(nbItem);
+    types.reserve(nbItem);
     if (!hT) {
-        items = make_unique<ENTRY[]>(nbItem);
-        fread(items.get(), sizeof(ENTRY), nbItem, f);
+        items.resize(nbItem);
+        readExact(f, items.data(), sizeof(ENTRY), nbItem);
     }
 
     for (uint32_t i = 0; i < nbItem; i++) {
@@ -51,8 +73,10 @@ uint32_t Kangaroo::CheckHash(uint32_t h, uint32_t nbItem, HashTable* hT, FILE* f
     for (uint32_t i = 0; i < nbItem; i++) {
         const ENTRY* e = hT ? hT->GetEntry(h, i) : &items[i];
         uint32_t hC = S[i].x.bits64[2] & HASH_MASK;
-        ok = (hC == h) && (S[i].x.bits64[0] == e->x.i64[0]) && (S[i].x.bits64[1] == e->x.i64[1])  && (S[i].x.bits64[2] == e->x.i64[2])  && (S[i].x.bits64[3] == e->x.i64[3]);
-        if (!ok) nbWrong++;
+        if ((hC != h) || (S[i].x.bits64[0] != e->x.i64[0]) || (S[i].x.bits64[1] != e->x.i64[1])  ||
+            (S[i].x.bits64[2] != e->x.i64[2])  || (S[i].x.bits64[3] != e->x.i64[3])) {
+            nbWrong++;
+        }
     }
 
     return nbWrong;
@@ -70,8 +94,8 @@ bool Kangaroo::CheckPartition(TH_PARAM* p) {
 
     for (uint32_t h = hStart; h < hStop; h++) {
         uint32_t nbItem, maxItem;
-        f1.read(reinterpret_cast<char*>(&nbItem), sizeof(uint32_t));
-        f1.read(reinterpret_cast<char*>(&maxItem), sizeof(uint32_t));
+        readValue(f1, nbItem);
+        readValue(f1, maxItem);
         if (nbItem == 0) continue;
         p->hStop += CheckHash(h, nbItem, nullptr, nullptr);
         p->hStart += nbItem;
@@ -113,17 +137,14 @@ void Kangaroo::CheckPartition(int nbCore,std::string& partName) {
 
   t0 = Timer::getTick();
 
-  FILE* f1 = NULL;
+  FileHandle f1;
   WorkFilePayload payload;
   if(!LoadWorkPayload(partName+"/header","CheckPartition",&v1,&f1,payload))
     return;
 
   if(!SetSearchContext(payload.rangeStart,payload.rangeEnd,payload.key,"CheckPartition")) {
-    ::fclose(f1);
     return;
   }
-
-  ::fclose(f1);
 
   int l2 = (int)log2(nbCore);
   int nbThread = (int)pow(2.0,l2);
@@ -137,27 +158,22 @@ void Kangaroo::CheckPartition(int nbCore,std::string& partName) {
   uint64_t nbDP = 0;
   uint64_t nbWrong = 0;
 
-  for(int p = 0; p < MERGE_PART; p += nbThread) {
-
-    printf(".");
-
-    for(int i = 0; i < nbThread; i++) {
-      params[i].threadId = i;
-      params[i].isRunning = true;
-      params[i].hStart = p + i;
-      params[i].hStop = 0;
-      params[i].part1Name = partName;
-      thHandles[i] = LaunchThread(_checkPartThread,&params[i]);
-    }
-
-    JoinThreads(thHandles.data(),nbThread);
-
-    for(int i = 0; i < nbThread; i++) {
-      nbDP += params[i].hStart;
-      nbWrong += params[i].hStop;
-    }
-
-  }
+  RunCheckBatches(MERGE_PART, nbThread, nbThread, params, thHandles, _checkPartThread,
+    [](int) {},
+    [&](int base, int i, TH_PARAM& param) {
+      param.obj = this;
+      param.threadId = i;
+      param.isRunning = true;
+      param.hStart = base + i;
+      param.hStop = 0;
+      param.part1Name = partName;
+    },
+    [&](int) {
+      for(int i = 0; i < nbThread; i++) {
+        nbDP += params[i].hStart;
+        nbWrong += params[i].hStop;
+      }
+    });
 
   t1 = Timer::getTick();
 
@@ -189,13 +205,12 @@ void Kangaroo::CheckWorkFile(int nbCore,std::string& fileName) {
     
   t0 = Timer::getTick();
 
-  FILE* f1 = NULL;
+  FileHandle f1;
   WorkFilePayload payload;
   if(!LoadWorkPayload(fileName,"CheckWorkFile",&v1,&f1,payload))
     return;
 
   if(!SetSearchContext(payload.rangeStart,payload.rangeEnd,payload.key,"CheckWorkFile")) {
-    ::fclose(f1);
     return;
   }
 
@@ -211,37 +226,27 @@ void Kangaroo::CheckWorkFile(int nbCore,std::string& fileName) {
   std::vector<THREAD_HANDLE> thHandles(nbThread);
 
   int block = HASH_SIZE / 64;
-
-  for(int s = 0; s < HASH_SIZE; s += block) {
-
-    ::printf(".");
-
-    uint32_t S = s;
-    uint32_t E = s + block;
-
-    // Load hashtables
-    hashTable.LoadTable(f1,S,E);
-
-    int stride = block / nbThread;
-
-    for(int i = 0; i < nbThread; i++) {
-      params[i].threadId = i;
-      params[i].isRunning = true;
-      params[i].hStart = S + i * stride;
-      params[i].hStop = S + (i + 1) * stride;
-      thHandles[i] = LaunchThread(_checkWorkThread,&params[i]);
-    }
-    JoinThreads(thHandles.data(),nbThread);
-
-    for(int i = 0; i < nbThread; i++)
-      nbWrong += params[i].hStop;
-    nbDP += hashTable.GetNbItem();
-
-    hashTable.Reset();
-
-  }
-
-  ::fclose(f1);
+  RunCheckBatches(HASH_SIZE, block, nbThread, params, thHandles, _checkWorkThread,
+    [&](int base) {
+      uint32_t S = (uint32_t)base;
+      uint32_t E = S + block;
+      hashTable.LoadTable(f1.get(),S,E);
+    },
+    [&](int base, int i, TH_PARAM& param) {
+      uint32_t S = (uint32_t)base;
+      uint32_t stride = (uint32_t)(block / nbThread);
+      param.obj = this;
+      param.threadId = i;
+      param.isRunning = true;
+      param.hStart = S + (uint32_t)i * stride;
+      param.hStop = S + (uint32_t)(i + 1) * stride;
+    },
+    [&](int) {
+      for(int i = 0; i < nbThread; i++)
+        nbWrong += params[i].hStop;
+      nbDP += hashTable.GetNbItem();
+      hashTable.Reset();
+    });
 
   t1 = Timer::getTick();
 

@@ -1,4 +1,5 @@
 #include "hashtable.h"
+#include "workfile.h"
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -10,23 +11,21 @@
 namespace {
 
 bool ReadBucketHeader(FILE* f, uint32_t& nbItem, uint32_t& maxItem) {
-    return fread(&nbItem, sizeof(uint32_t), 1, f) == 1 &&
-           fread(&maxItem, sizeof(uint32_t), 1, f) == 1;
+    return workfile::readValue(f, nbItem) && workfile::readValue(f, maxItem);
 }
 
 bool WriteBucketHeader(FILE* f, uint32_t nbItem, uint32_t maxItem) {
-    return fwrite(&nbItem, sizeof(uint32_t), 1, f) == 1 &&
-           fwrite(&maxItem, sizeof(uint32_t), 1, f) == 1;
+    return workfile::writeValue(f, nbItem) && workfile::writeValue(f, maxItem);
 }
 
 bool ReadEntry(FILE* f, ENTRY& entry) {
-    return fread(&entry.x, 16, 1, f) == 1 &&
-           fread(&entry.d, 16, 1, f) == 1;
+    return workfile::readExact(f, &entry.x, 16) &&
+           workfile::readExact(f, &entry.d, 16);
 }
 
 bool WriteEntry(FILE* f, const ENTRY& entry) {
-    return fwrite(&entry.x, 16, 1, f) == 1 &&
-           fwrite(&entry.d, 16, 1, f) == 1;
+    return workfile::writeExact(f, &entry.x, 16) &&
+           workfile::writeExact(f, &entry.d, 16);
 }
 
 }  // namespace
@@ -117,7 +116,7 @@ int HashTable::MergeH(uint32_t h, FILE* f1, FILE* f2, FILE* fd, uint32_t* nbDP, 
     auto drainRemaining = [&](FILE* f, uint32_t remaining) {
         while (remaining > 0) {
             uint32_t batchSize = std::min(remaining, (uint32_t)1024);
-            fread(&output[nbd], sizeof(ENTRY), batchSize, f);
+            workfile::readExact(f, &output[nbd], sizeof(ENTRY), batchSize);
             nbd += batchSize;
             remaining -= batchSize;
         }
@@ -167,7 +166,7 @@ int HashTable::MergeH(uint32_t h, FILE* f1, FILE* f2, FILE* fd, uint32_t* nbDP, 
 
     md = (nbd + 3) / 4 * 4;
     WriteBucketHeader(fd, nbd, md);
-    fwrite(output.data(), sizeof(ENTRY), nbd, fd);
+    workfile::writeExact(fd, output.data(), sizeof(ENTRY), nbd);
     *nbDP = nbd;
 
     return collisionFound ? ADD_COLLISION : ADD_OK;

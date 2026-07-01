@@ -7,18 +7,22 @@
 #include <iomanip>
 #include <sstream>
 #include <pthread.h>
+#include <thread>
 
 using namespace std;
 
 THREAD_HANDLE Kangaroo::LaunchThread(void *(*func) (void *), TH_PARAM *p) {
-  THREAD_HANDLE h;
   p->obj = this;
-  pthread_create(&h, NULL, func, (void*)(p));
-  return h;
+  return THREAD_HANDLE([func, p]() {
+    func((void*)p);
+  });
 }
 void  Kangaroo::JoinThreads(THREAD_HANDLE *handles, int nbThread) {
-  for (int i = 0; i < nbThread; i++)
-    pthread_join(handles[i], NULL);
+  for (int i = 0; i < nbThread; i++) {
+    if (handles[i].joinable()) {
+      handles[i].join();
+    }
+  }
 }
 
 bool Kangaroo::isAlive(TH_PARAM *p) {
@@ -110,9 +114,10 @@ void Kangaroo::ProcessServer() {
 
     while (!endOfSearch) {
         double t1 = Timer::getTick();
-        LOCK(ghMutex);
-        localCache.swap(recvDP);
-        UNLOCK(ghMutex);
+        {
+            std::lock_guard<std::mutex> lock(ghMutex);
+            localCache.swap(recvDP);
+        }
 
         for (auto& dp : localCache) {
             for (size_t j = 0; j < dp.dp.size() && !endOfSearch; j++) {

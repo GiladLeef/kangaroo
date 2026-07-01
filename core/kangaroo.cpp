@@ -7,9 +7,10 @@
 #include <math.h>
 #include <algorithm>
 #include <memory>
-#include <pthread.h>
 #include <signal.h>
 #include <iostream>
+#include <iomanip>
+#include <mutex>
 
 using namespace std;
 
@@ -46,8 +47,6 @@ Kangaroo::Kangaroo(Secp256K1 *secp,int32_t initDPSize,bool useGpu,string &workFi
 
   CPU_GRP_SIZE = 1024;
 
-  pthread_mutex_init(&ghMutex, NULL);
-  pthread_mutex_init(&saveMutex, NULL);
   signal(SIGFPE, SIG_IGN);
 
 }
@@ -59,12 +58,11 @@ bool Kangaroo::ParseConfigFile(std::string &fileName) {
     return true;
 
   // Check file
-  FILE *fp = fopen(fileName.c_str(),"rb");
-  if(fp == NULL) {
+  ifstream fp(fileName);
+  if(!fp.is_open()) {
     ::printf("Error: Cannot open %s %s\n",fileName.c_str(),strerror(errno));
     return false;
   }
-  fclose(fp);
 
   // Get lines
   vector<string> lines;
@@ -136,37 +134,30 @@ void Kangaroo::SetDP(int size) {
 }
 
 bool Kangaroo::Output(Int* pk, char sInfo, int sType) {
-    FILE* f = stdout;
-    bool needToClose = false;
+    ofstream out;
+    std::ostream* f = &std::cout;
 
     if (!outputFile.empty()) {
-        f = fopen(outputFile.c_str(), "a");
-        if (f == nullptr) {
+        out.open(outputFile, ios::app);
+        if (!out.is_open()) {
             std::cerr << "Cannot open " << outputFile << " for writing\n";
-            f = stdout;
         } else {
-            needToClose = true;
+            f = &out;
         }
     }
 
-    if (!needToClose) {
+    if (f == &std::cout) {
         std::printf("\n");
     }
 
     Point PR = secp->ComputePublicKey(pk);
 
     if (PR.equals(keysToSearch[keyIdx])) {
-        std::fprintf(f, "Key#%2d [%d%c]Pub:  0x%s \n", keyIdx, sType, sInfo, secp->GetPublicKeyHex(true, keysToSearch[keyIdx]).c_str());
-        std::fprintf(f, "       Priv: 0x%s \n", pk->GetBase16().c_str());
+        (*f) << "Key#" << std::setw(2) << keyIdx << " [" << sType << sInfo
+             << "]Pub:  0x" << secp->GetPublicKeyHex(true, keysToSearch[keyIdx]) << " \n";
+        (*f) << "       Priv: 0x" << pk->GetBase16() << " \n";
     } else {
-        if (needToClose) {
-            fclose(f);
-        }
         return false;
-    }
-
-    if (needToClose) {
-        fclose(f);
     }
 
     return true;
@@ -383,13 +374,12 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
                 for (int g = 0; g < CPU_GRP_SIZE && !endOfSearch; g++) {
                     // Forward
                     if (isDPs[g]) {
-                        LOCK(ghMutex);
+                        std::lock_guard<std::mutex> lock(ghMutex);
                         if (!AddToTable(&ph->px[g], &ph->distance[g], g % 2)) {
                             // Collision inside the same herd – reset tame/wild
                             CreateHerd(1, &ph->px[g], &ph->py[g], &ph->distance[g], g % 2, false);
                             collisionInSameHerd++;
                         }
-                        UNLOCK(ghMutex);
                     }
                     counters[thId] += 1;
                 }
@@ -402,9 +392,8 @@ void Kangaroo::SolveKeyCPU(TH_PARAM *ph) {
         // Save request
         if (saveRequest && !endOfSearch) {
             ph->isWaiting = true;
-            LOCK(saveMutex);
+            std::lock_guard<std::mutex> lock(saveMutex);
             ph->isWaiting = false;
-            UNLOCK(saveMutex);
         }
     }
 
@@ -498,7 +487,7 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
         
         for(int g = 0; !endOfSearch && g < gpuFound.size(); g++) {
           
-          LOCK(ghMutex);
+          std::lock_guard<std::mutex> lock(ghMutex);
           uint32_t kType = (uint32_t)(gpuFound[g].kIdx % 2);
           if(!AddToTable(&gpuFound[g].x,&gpuFound[g].d,kType)) {
             // Collision inside the same herd
@@ -510,7 +499,6 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
             gpu->SetKangaroo(gpuFound[g].kIdx,&px,&py,&d);
             collisionInSameHerd++;
           }
-          UNLOCK(ghMutex);
 
         }
       }
@@ -521,9 +509,8 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
       if(saveKangaroo)
         gpu->GetKangaroos(ph->px.data(),ph->py.data(),ph->distance.data());
       ph->isWaiting = true;
-      LOCK(saveMutex);
+      std::lock_guard<std::mutex> lock(saveMutex);
       ph->isWaiting = false;
-      UNLOCK(saveMutex);
     }
   }
 
