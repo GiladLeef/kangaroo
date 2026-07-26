@@ -2,16 +2,8 @@
 
 The source code of this software can be found at https://github.com/giladleef/kangaroo.
 
-This program offers a powerful solution for tackling the Elliptic Curve Discrete Logarithm Problem (ECDLP) within the context of SECP256K1. Here's a detailed overview of the features and functionality of this solver:
-### Features
+This program offers a powerful solution for tackling the Elliptic Curve Discrete Logarithm Problem (ECDLP) within the context of SECP256K1.
 
-- **254-bit search range:** The search range extended to 254 bits using fixed-size 256-bit arithmetic.
-- **Endomorphism optimization:** Comparing only the Y-coordinates enables finding a collision three times faster.
-- **Fast modular inversion:** Implements fast modular inversion using Delayed Right Shift 62 bits.
-- **Fast modular multiplication:** Utilizes 2 steps folding 512 bits to 256 bits reduction using 64-bit digits.
-- **Multi-GPU support:** with CUDA optimisation via inline PTX assembly.
-
-This program is based on https://github.com/JeanLucPons/Kangaroo.
 ### How It Works
 
 The algorithm employs two herds of kangaroos, a tame herd, and a wild herd. When a kangaroo from each herd collides, the key can be solved. The distinguished points method with a hashtable is used to detect collisions efficiently. The algorithm iteratively updates the positions of the kangaroos until a collision is detected, leading to the solution of the ECDLP.
