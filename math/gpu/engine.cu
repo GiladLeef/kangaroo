@@ -120,6 +120,7 @@ GPUEngine::GPUEngine(int nbThreadGroup,int nbThreadPerGroup,int gpuId,uint32_t m
   outputItem = NULL;
   outputItemPinned = NULL;
   jumpPinned = NULL;
+  resultReady = NULL;
 
   // Input kangaroos
   kangarooSize = nbThread * GPU_GRP_SIZE * KSIZE * 8;
@@ -134,6 +135,14 @@ GPUEngine::GPUEngine(int nbThreadGroup,int nbThreadPerGroup,int gpuId,uint32_t m
     printf("GPUEngine: Allocate input pinned memory: %s\n",cudaGetErrorString(err));
     return;
   }
+
+  cudaEvent_t event;
+  err = cudaEventCreateWithFlags(&event,cudaEventDisableTiming);
+  if(err != cudaSuccess) {
+    printf("GPUEngine: Create result event: %s\n",cudaGetErrorString(err));
+    return;
+  }
+  resultReady = event;
 
   // OutputHash
   err = cudaMalloc((void **)&outputItem,outputSize);
@@ -168,6 +177,7 @@ GPUEngine::~GPUEngine() {
   if(inputKangarooPinned) cudaFreeHost(inputKangarooPinned);
   if(outputItemPinned) cudaFreeHost(outputItemPinned);
   if(jumpPinned) cudaFreeHost(jumpPinned);
+  if(resultReady) cudaEventDestroy((cudaEvent_t)resultReady);
 
 }
 
@@ -480,16 +490,10 @@ bool GPUEngine::Launch(std::vector<ITEM> &hashFound,bool spinWait) {
   if(spinWait) {
     cudaMemcpy(outputItemPinned,outputItem,outputSize,cudaMemcpyDeviceToHost);
   } else {
-    // Use cudaMemcpyAsync to avoid default spin wait of cudaMemcpy wich takes 100% CPU
-    cudaEvent_t evt;
-    cudaEventCreate(&evt);
+    // Reuse the event rather than allocating and polling one every launch.
     cudaMemcpyAsync(outputItemPinned,outputItem,4,cudaMemcpyDeviceToHost,0);
-    cudaEventRecord(evt,0);
-    while(cudaEventQuery(evt) == cudaErrorNotReady) {
-      // Sleep 1 ms to free the CPU
-      Timer::SleepMillis(1);
-    }
-    cudaEventDestroy(evt);
+    cudaEventRecord((cudaEvent_t)resultReady,0);
+    cudaEventSynchronize((cudaEvent_t)resultReady);
   }
 
   cudaError_t err = cudaGetLastError();

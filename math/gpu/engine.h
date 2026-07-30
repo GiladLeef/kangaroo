@@ -41,6 +41,7 @@ private:
   uint32_t *outputItem;
   uint32_t *outputItemPinned;
   uint64_t *jumpPinned;
+  void *resultReady;
   bool initialised;
   bool lostWarning;
   uint32_t maxFound;

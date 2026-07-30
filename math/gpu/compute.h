@@ -21,8 +21,6 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
     // P1 = jumpPoint
     // P2 = kangaroo
     
-    __syncthreads();
-    
     // First pass - prepare data and calculate dx
     for(int g = 0; g < GPU_GRP_SIZE; g++) {
       jmp[g] = (uint32_t)px[g][0] & (NB_JUMP-1);
@@ -31,8 +29,6 @@ __device__ void ComputeKangaroos(uint64_t *kangaroos,uint32_t maxFound,uint32_t 
     
     // Batch inversion - most expensive operation
     _ModInvGrouped(dx);
-    __syncthreads();
-
     // Second pass - calculate forward points
     for(int g = 0; g < GPU_GRP_SIZE; g++) {
       ModSub256(dy,py[g],jPy[jmp[g]]);

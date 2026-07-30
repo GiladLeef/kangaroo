@@ -484,10 +484,9 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
 
     } else {
       if(gpuFound.size() > 0) {
-        
+        // AddToTable is not concurrent; lock once for the whole GPU batch.
+        std::lock_guard<std::mutex> lock(ghMutex);
         for(int g = 0; !endOfSearch && g < gpuFound.size(); g++) {
-          
-          std::lock_guard<std::mutex> lock(ghMutex);
           uint32_t kType = (uint32_t)(gpuFound[g].kIdx % 2);
           if(!AddToTable(&gpuFound[g].x,&gpuFound[g].d,kType)) {
             // Collision inside the same herd
