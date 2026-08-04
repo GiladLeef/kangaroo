@@ -1,16 +1,5 @@
-#include <signal.h>
 #include "kangaroo.h"
-#include <fstream>
-#include "intgroup.h"
-#include "timer.h"
-#include <string.h>
-#include <math.h>
-#include <algorithm>
-#include <memory>
-#include <signal.h>
-#include <iostream>
-#include <iomanip>
-#include <mutex>
+#include "engine.h"
 
 using namespace std;
 

@@ -1,16 +1,7 @@
 #include <x86intrin.h>
 
-#include "int.h"
-#include "intgroup.h"
-#include <string.h>
-#include <math.h>
+#include "kangaroo.h"
 #include <emmintrin.h>
-#include "timer.h"
-#include <algorithm>
-#include <array>
-#include <cctype>
-#include <iomanip>
-#include <sstream>
 
 #define MAX(x,y) (((x)>(y))?(x):(y))
 #define MIN(x,y) (((x)<(y))?(x):(y))

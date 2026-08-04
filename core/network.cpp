@@ -1,22 +1,6 @@
 #include "kangaroo.h"
-#include <fstream>
-#include "intgroup.h"
-#include "timer.h"
-#include "workfile.h"
-#include <string.h>
-#include <math.h>
-#include <algorithm>
-#include <signal.h>
-#include <unordered_map>
-#include <memory>
-#include <array>
-#include <utility>
-#include <vector>
-#include <filesystem>
-#include <mutex>
 
 using namespace std;
-namespace fs = std::filesystem;
 
 static SOCKET serverSock = 0;
 
@@ -47,8 +31,6 @@ static SOCKET serverSock = 0;
 
 
 #define close_socket(s) close(s)
-
-constexpr uint32_t MAX_NETWORK_FILENAME = 256;
 
 namespace {
 

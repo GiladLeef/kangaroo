@@ -1,8 +1,4 @@
-#include "secp256k1.h"
-#include "intgroup.h"
-#include <string.h>
-#include <iomanip>
-#include <sstream>
+#include "kangaroo.h"
 
 Secp256K1::Secp256K1() {}
 

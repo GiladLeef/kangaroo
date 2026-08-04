@@ -29,4 +29,22 @@
 // Number of merge partition
 #define MERGE_PART 256
 
+// Hash table configuration
+#define HASH_SIZE_BIT 18
+#define HASH_SIZE (1<<HASH_SIZE_BIT)
+#define HASH_MASK (HASH_SIZE-1)
+
+// Hash table add results
+#define ADD_OK        0
+#define ADD_DUPLICATE 1
+#define ADD_COLLISION 2
+
+// Work file types
+#define HEADW  0xFA6A8001  // Full work file
+#define HEADK  0xFA6A8002  // Kangaroo only file
+#define HEADKS 0xFA6A8003  // Compressed Kangaroo only file
+
+// Number of Hash entry per partition
+#define H_PER_PART (HASH_SIZE / MERGE_PART)
+
 #endif //CONSTANTSH

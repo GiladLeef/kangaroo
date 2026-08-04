@@ -1,4 +1,4 @@
-#include "point.h"
+#include "kangaroo.h"
 
 Point::Point() {}
 

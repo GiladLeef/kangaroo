@@ -1,22 +1,7 @@
 #include "kangaroo.h"
-#include <fstream>
-#include "intgroup.h"
-#include "timer.h"
-#include "workfile.h"
-#include <string.h>
-#include <math.h>
-#include <algorithm>
-#include <dirent.h>
-#include <pthread.h>
-#include <sys/stat.h>
-#include <iostream>
-#include <filesystem>
-#include <iomanip>
-#include <sstream>
 
 using namespace std;
 using namespace workfile;
-namespace fs = std::filesystem;
 
 namespace {
 

@@ -1,4 +1,4 @@
-#include "intgroup.h"
+#include "kangaroo.h"
 
 using namespace std;
 

@@ -9,7 +9,6 @@
 #include "engine.h"
 
 #include <stdint.h>
-#include "timer.h"
 
 #include "kernel.h"
 #include "compute.h"

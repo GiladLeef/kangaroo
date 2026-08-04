@@ -1,5 +1,4 @@
-#include "int.h"
-#include <string.h>
+#include "kangaroo.h"
 #include <emmintrin.h>
 
 #define MAX(x,y) (((x)>(y))?(x):(y))

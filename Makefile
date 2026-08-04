@@ -1,4 +1,4 @@
-# Kangaroo — built entirely with clang (host + CUDA device), always with GPU.
+# Kangaroo — plain header-based build (no modules), always with GPU.
 # GPU arch auto-detected from nvidia-smi; override with:  make CCAP=86
 
 CXX        = clang++
@@ -8,41 +8,44 @@ CUDA      ?= /usr/local/cuda
 CCAP      ?= $(shell nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -1 | tr -d '.')
 CCAP      ?= 61
 
+# Cap device registers so ptxas leaves enough per SM for 6 blocks/SM occupancy.
+# Without this cap clang's default allocation (~148 regs) drops occupancy to
+# 3 blocks/SM, running ~30% slower than nvcc. ~80 regs restores nvcc-level speed.
+GPU_MAXRREG ?= 80
+
 OBJDIR    = obj
 
 INCS      = -I$(CUDA)/include -I. -Icore -Imemory -Istorage -Imath -Imath/cpu -Imath/gpu -Icompat
 
 CXXFLAGS  = -std=c++23 -m64 -march=native -mtune=native -msse4.2 -mavx2 \
-            -ffast-math -funroll-loops -fomit-frame-pointer -flto \
-            -Wno-unused-result -Wno-write-strings -O3 $(INCS)
+            -ffast-math -funroll-loops -fomit-frame-pointer \
+            -Wno-unused-result -Wno-write-strings -Wno-vla-cxx-extension -O3 $(INCS)
 
 # Host builds emit the kernel launcher for CUDA-aware translation units.
-CUDAFLAGS = $(CXXFLAGS) -x cuda --cuda-gpu-arch=sm_$(CCAP) --cuda-path=$(CUDA)
-LDFLAGS   = -lpthread -L$(CUDA)/lib64 -lcudart -flto
+CUDAFLAGS = $(CXXFLAGS) -x cuda --cuda-gpu-arch=sm_$(CCAP) --cuda-path=$(CUDA) \
+            -Xcuda-ptxas -maxrregcount=$(GPU_MAXRREG)
+LDFLAGS   = -lpthread -L$(CUDA)/lib64 -lcudart
 
-SRC      = math/cpu/int.cpp math/cpu/intgroup.cpp math/cpu/intmod.cpp \
-           math/point.cpp math/secp256k1.cpp \
-           core/timer.cpp core/kangaroo.cpp core/thread.cpp core/network.cpp \
-           memory/hashtable.cpp \
-           storage/check.cpp storage/backup.cpp storage/merge.cpp \
-           main.cpp
+SOURCES   = main.cpp math/cpu/int.cpp math/cpu/intmod.cpp math/cpu/intgroup.cpp \
+            math/point.cpp math/secp256k1.cpp memory/hashtable.cpp core/timer.cpp \
+            core/kangaroo.cpp core/thread.cpp core/network.cpp \
+            storage/check.cpp storage/backup.cpp storage/merge.cpp
+OBJECTS   = $(patsubst %.cpp,$(OBJDIR)/%.o,$(SOURCES))
+OBJECTS  += $(OBJDIR)/math/gpu/engine.o
 
-OBJET    = $(addprefix $(OBJDIR)/,$(SRC:.cpp=.o))
-OBJET   += $(OBJDIR)/math/gpu/engine.o
+all: kangaroo
 
-all: Kangaroo
+kangaroo: $(OBJECTS)
+	@echo "Linking kangaroo..."
+	$(CXX) $(OBJECTS) $(LDFLAGS) -o kangaroo
 
-Kangaroo: $(OBJET)
-	@echo "Linking Kangaroo..."
-	$(CXX) $(OBJET) $(LDFLAGS) -o kangaroo
+$(OBJDIR)/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 $(OBJDIR)/math/gpu/engine.o: math/gpu/engine.cu
 	@mkdir -p $(dir $@)
 	$(CXX) $(CUDAFLAGS) -o $@ -c math/gpu/engine.cu
-
-$(OBJDIR)/%.o : %.cpp
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 clean:
 	@echo Cleaning...

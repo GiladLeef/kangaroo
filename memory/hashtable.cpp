@@ -1,12 +1,4 @@
-#include "hashtable.h"
-#include "workfile.h"
-#include <stdio.h>
-#include <math.h>
-#include <string.h>
-#include <stdlib.h>
-#include <algorithm>
-#include <iomanip>
-#include <sstream>
+#include "kangaroo.h"
 
 namespace {
 

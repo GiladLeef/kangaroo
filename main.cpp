@@ -1,14 +1,4 @@
 #include "kangaroo.h"
-#include "timer.h"
-#include "secp256k1.h"
-#include <fstream>
-#include <string>
-#include <vector>
-#include <stdexcept>
-#include <iostream>
-#include <sstream>
-#include <memory>
-#include <cstring>
 
 using namespace std;
 

@@ -1,15 +1,4 @@
 #include "kangaroo.h"
-#include <fstream>
-#include "intgroup.h"
-#include "timer.h"
-#include "workfile.h"
-#include <string>
-#include <vector>
-#include <iostream>
-#include <thread>
-#include <atomic>
-#include <cmath>
-#include <cstring>
 using namespace std;
 using namespace workfile;
 

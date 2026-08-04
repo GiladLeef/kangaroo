@@ -1,13 +1,5 @@
 #include "kangaroo.h"
-#include "timer.h"
-#include <string.h>
-#include <math.h>
-#include <algorithm>
-#include <array>
-#include <iomanip>
-#include <sstream>
-#include <pthread.h>
-#include <thread>
+#include "engine.h"
 
 using namespace std;
 

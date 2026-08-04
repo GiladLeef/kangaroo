@@ -1,9 +1,10 @@
 #ifndef GPUENGINEH
 #define GPUENGINEH
 
+#include <string>
 #include <vector>
 #include "constants.h"
-#include "secp256k1.h"
+#include "int.h"
 
 #define KSIZE 12
 #define ITEM_SIZE   76

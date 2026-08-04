@@ -1,18 +1,7 @@
 #include "kangaroo.h"
-#include <fstream>
-#include "intgroup.h"
-#include "timer.h"
-#include "workfile.h"
-#include <string.h>
-#include <math.h>
-#include <algorithm>
-#include <sys/stat.h>
-#include <filesystem>
-#include <mutex>
 
 using namespace std;
 using namespace workfile;
-namespace fs = std::filesystem;
 
 int Kangaroo::FSeek(FILE* stream,uint64_t pos) {
   return fseeko(stream,pos,SEEK_SET);
