@@ -3,9 +3,6 @@
 #include "kangaroo.h"
 #include <emmintrin.h>
 
-#define MAX(x,y) (((x)>(y))?(x):(y))
-#define MIN(x,y) (((x)<(y))?(x):(y))
-
 Int _ONE((uint64_t)1);
 
 Int::Int() {

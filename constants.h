@@ -47,4 +47,7 @@
 // Number of Hash entry per partition
 #define H_PER_PART (HASH_SIZE / MERGE_PART)
 
+// Montgomery reduction mask (63-bit), shared by the CPU SIMD path and the GPU
+#define MSK62 0x3FFFFFFFFFFFFFFF
+
 #endif //CONSTANTSH

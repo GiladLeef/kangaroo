@@ -3,6 +3,8 @@
 // ---------------------------------------------------------------------------------
 #pragma once
 
+#include "constants.h"
+
 // We need 1 extra block for ModInv
 #define NBBLOCK 5
 #define BIFULLSIZE 40
@@ -438,7 +440,6 @@ __device__ __forceinline__ uint32_t ctz(uint64_t x) {
 }
 
 #define SWAP(tmp,x,y) tmp = x; x = y; y = tmp;
-#define MSK62 0x3FFFFFFFFFFFFFFF
 
 __device__ void _DivStep62(uint64_t u[5],uint64_t v[5],
                            int32_t *pos,

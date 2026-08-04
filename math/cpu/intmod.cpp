@@ -1,9 +1,6 @@
 #include "kangaroo.h"
 #include <emmintrin.h>
 
-#define MAX(x,y) (((x)>(y))?(x):(y))
-#define MIN(x,y) (((x)<(y))?(x):(y))
-
 static Int     _P;       // Field characteristic
 static Int     _R;       // Montgomery multiplication R
 static Int     _R2;      // Montgomery multiplication R2
@@ -12,7 +9,6 @@ static Int     _R4;      // Montgomery multiplication R4
 static int32_t  Msize;    // Montgomery mult size
 static uint32_t MM32;     // 32bits lsb negative inverse of P
 static uint64_t MM64;     // 64bits lsb negative inverse of P
-#define MSK62  0x3FFFFFFFFFFFFFFF
 
 extern Int _ONE;
 
