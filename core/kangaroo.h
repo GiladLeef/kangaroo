@@ -44,11 +44,9 @@ typedef struct {
   bool hasStarted;
   bool isWaiting;
   uint64_t nbKangaroo;
-#ifdef WITHGPU
   int  gridSizeX;
   int  gridSizeY;
   int  gpuId;
-#endif
   std::vector<Int> px; // Kangaroo position
   std::vector<Int> py; // Kangaroo position
   std::vector<Int> distance; // Travelled distance

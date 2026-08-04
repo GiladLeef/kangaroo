@@ -412,8 +412,6 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
   // Global init
   int thId = ph->threadId;
 
-#ifdef WITHGPU
-
   // Static array to track which GPUs have been initialized (max 256 GPUs)
   static bool gpuInitialized[256] = {false};
   vector<ITEM> dps;
@@ -516,9 +514,7 @@ void Kangaroo::SolveKeyGPU(TH_PARAM *ph) {
   ph->px.clear();
   ph->py.clear();
   ph->distance.clear();
-#else
-  ph->hasStarted = true;
-#endif
+
   ph->isRunning = false;
 }
 
@@ -711,12 +707,6 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
     nbCPUThread = nbThread;
   nbGPUThread = (useGpu ? (int)gpuId.size() : 0);
     totalRW = 0;
-#ifndef WITHGPU
-  if(nbGPUThread>0) {
-    ::printf("GPU code not compiled, use -DWITHGPU when compiling.\n");
-    nbGPUThread = 0;
-  }
-#endif
     uint64_t totalThread = (uint64_t)nbCPUThread + (uint64_t)nbGPUThread;
     if(totalThread == 0) {
       ::printf("No CPU or GPU threads found, exiting...\n");
@@ -726,7 +716,6 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
     std::vector<THREAD_HANDLE> thHandles(totalThread);
     counters.fill(0);
     ::printf("Number of CPU threads: %d\n", nbCPUThread);
-#ifdef WITHGPU
   // Compute grid size
   for(int i = 0; i < nbGPUThread; i++) {    
     int x = gridSize[2ULL * i];
@@ -741,7 +730,6 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
     params[nbCPUThread + i].nbKangaroo = (uint64_t)GPU_GRP_SIZE * x * y;
     totalRW += params[nbCPUThread + i].nbKangaroo;
   }
-#endif
     totalRW += nbCPUThread * (uint64_t)CPU_GRP_SIZE;
     // Set starting parameters
     if (clientMode) {
@@ -799,7 +787,6 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
                 params[i].isRunning = true;
                 thHandles[i] = LaunchThread(_SolveKeyCPU, &params[i]);
             }
-            #ifdef WITHGPU
                   // Launch GPU threads
                   for(int i = 0; i < nbGPUThread; i++) {
                     int id = nbCPUThread + i;
@@ -808,8 +795,6 @@ void Kangaroo::Run(int nbThread,std::vector<int> gpuId,std::vector<int> gridSize
                     params[id].gpuId = gpuId[i];
                     thHandles[id] = LaunchThread(_SolveKeyGPU, &params[id]);
                   }
-
-            #endif
             // Wait for end
             Process(params.data(), "MK/s");
             JoinThreads(thHandles.data(), nbCPUThread);

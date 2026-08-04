@@ -1,4 +1,4 @@
-#include "compat/cuda.h"
+#include "compat/cudashim.h"
 #include <cuda.h>
 #include <cuda_runtime.h>
 
@@ -429,7 +429,7 @@ bool GPUEngine::callKernel() {
   // Reset nbFound
   cudaMemset(outputItem,0,4);
   // Call the kernel (Perform STEP_SIZE keys per thread)
-  comp_kangaroos << < nbThread / nbThreadPerGroup,nbThreadPerGroup >> >
+  comp_kangaroos<<<nbThread / nbThreadPerGroup,nbThreadPerGroup>>>
       (inputKangaroo,maxFound,outputItem,dpMask);
 
   cudaError_t err = cudaGetLastError();

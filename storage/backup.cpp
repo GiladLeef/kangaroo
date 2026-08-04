@@ -235,7 +235,6 @@ void Kangaroo::FectchKangaroos(TH_PARAM *threads) {
         FetchWalks(CPU_GRP_SIZE,kangs,threads[i].px.data(),threads[i].py.data(),threads[i].distance.data());
     }
     ::printf("Done\n");
-#ifdef WITHGPU
     for(int i = 0; i < nbGPUThread; i++) {
       ::printf(".");
       int id = nbCPUThread + i;
@@ -254,7 +253,6 @@ void Kangaroo::FectchKangaroos(TH_PARAM *threads) {
             threads[id].py.data(),
             threads[id].distance.data());
     }
-#endif
     double eFetch = Timer::getTick();
     if(nbLoadedWalk != 0) {
       ::printf("FectchKangaroos: Warning %.0f unhandled kangaroos !\n",(double)nbLoadedWalk);
